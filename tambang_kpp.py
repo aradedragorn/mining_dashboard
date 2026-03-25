@@ -26,7 +26,8 @@ st.set_page_config(
 )
 
 # Path logo - sesuaikan dengan path logo Anda
-LOGO_PATH = r"C:\Users\ASUS\Pictures\Photoscorp_CR-U-AA-0004468f75b9ef1f16.png"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
 
 # Fungsi untuk mengonversi gambar ke base64 dengan resize
 def get_base64_image(image_path, size=(120, 120)):  # Diperbesar dari 60 ke 120

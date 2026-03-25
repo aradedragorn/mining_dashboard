@@ -1,6 +1,7 @@
-streamlit>=1.40.0
 numpy
 pandas
 plotly
+streamlit>=1.40.0
 Pillow
 openpyxl
+kaleido

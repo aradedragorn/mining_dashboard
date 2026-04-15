@@ -733,6 +733,68 @@ def format_large(num):
     elif abs(num) >= 1e3: 
         return f"{num/1e3:.1f}K"
     return f"{num:.0f}"
+def get_available_demo_files():
+    return {name: path for name, path in DEMO_FILES.items() if path.exists()}
+
+def get_active_data_source():
+    available_demo_files = get_available_demo_files()
+
+    with st.sidebar:
+        st.markdown("### DATA SOURCE")
+
+        source_mode = st.radio(
+            "Pilih sumber data:",
+            ["Pilih Data Demo", "Upload Excel"],
+            index=0,
+            key="data_source_mode"
+        )
+
+        selected_file = None
+        selected_file_name = None
+        selected_source_type = None
+
+        if source_mode == "Pilih Data Demo":
+            if not available_demo_files:
+                st.warning("Folder demo_data belum berisi file demo.")
+            else:
+                demo_choice = st.selectbox(
+                    "Pilih data demo:",
+                    list(available_demo_files.keys()),
+                    key="demo_file_choice"
+                )
+                selected_file = available_demo_files[demo_choice]
+                selected_file_name = demo_choice
+                selected_source_type = "demo"
+                st.success(f"Demo aktif: {demo_choice}")
+        else:
+            uploaded = st.file_uploader(
+                "Upload Excel File",
+                type=["xlsx", "xls"],
+                key="excel_uploader"
+            )
+            if uploaded is not None:
+                selected_file = uploaded
+                selected_file_name = uploaded.name
+                selected_source_type = "upload"
+                st.success(f"File aktif: {uploaded.name}")
+
+        st.markdown("---")
+        st.markdown("### ACTIVE SOURCE")
+        st.markdown(f"""
+        <div style='background:rgba(255,255,255,0.08);padding:1rem;border-radius:12px;border:1px solid rgba(255,255,255,0.1)'>
+            <div style='font-size:0.75rem;color:#9ca3af;margin-bottom:0.3rem'>Mode</div>
+            <div style='font-size:0.95rem;font-weight:700;color:#ffffff;margin-bottom:0.7rem'>
+                {selected_source_type.upper() if selected_source_type else "-"}
+            </div>
+            <div style='font-size:0.75rem;color:#9ca3af;margin-bottom:0.3rem'>Source</div>
+            <div style='font-size:0.9rem;font-weight:600;color:#e5e7eb'>
+                {selected_file_name if selected_file_name else "Belum dipilih"}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    return selected_file, selected_file_name, selected_source_type
+
 
 # Tambahkan fungsi ini setelah fungsi format_large
 # ========== HELPER FUNCTIONS ==========

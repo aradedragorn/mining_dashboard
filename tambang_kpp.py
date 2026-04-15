@@ -788,23 +788,7 @@ def get_active_data_source():
                 selected_source_type = "upload"
                 st.success(f"File aktif: {uploaded.name}")
 
-        st.markdown("---")
-        st.markdown("### ACTIVE SOURCE")
-        st.markdown(f"""
-        <div style='background:rgba(255,255,255,0.08);padding:1rem;border-radius:12px;border:1px solid rgba(255,255,255,0.1)'>
-            <div style='font-size:0.75rem;color:#9ca3af;margin-bottom:0.3rem'>Mode</div>
-            <div style='font-size:0.95rem;font-weight:700;color:#ffffff;margin-bottom:0.7rem'>
-                {selected_source_type.upper() if selected_source_type else "-"}
-            </div>
-            <div style='font-size:0.75rem;color:#9ca3af;margin-bottom:0.3rem'>Source</div>
-            <div style='font-size:0.9rem;font-weight:600;color:#e5e7eb'>
-                {selected_file_name if selected_file_name else "Belum dipilih"}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
     return selected_file, selected_file_name, selected_source_type
-
 
 # Tambahkan fungsi ini setelah fungsi format_large
 # ========== HELPER FUNCTIONS ==========
@@ -1118,8 +1102,6 @@ def main():
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-    st.success("Data loaded successfully!")
 
     tab1, tab2, tab3, tab4 = st.tabs([
         " Overview",

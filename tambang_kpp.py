@@ -2751,13 +2751,11 @@ def main():
         # ══════════════════════════════════════════════════════════
         # TAB 4: PERFORMANCE REPORTS
         # ══════════════════════════════════════════════════════════
-
         matrix = create_matrix(df_ob, df_ch_cm)
         flow = create_flow(df_ch_cm)
         df_ch = df_ch_cm[df_ch_cm['CH_WB'].notna()].copy()
         df_cm_data = df_ch_cm[df_ch_cm['CM_WB'].notna()].copy()
 
-        # Pastikan kolom turunan deviation ada untuk report/export
         if flow is not None and len(flow) > 0:
             flow = flow.copy()
             if 'Net Deviation' not in flow.columns:
@@ -2824,9 +2822,6 @@ def main():
         ch_clr, ch_lbl2 = sbadge(ch_disp_dev)
         cm_clr, cm_lbl2 = sbadge(cm_disp_dev)
 
-        # ════════════════════════════════════════════════════
-        # 2) PERFORMANCE MATRIX TABLE
-        # ════════════════════════════════════════════════════
         st.markdown("""
         <div class="section-header" style="margin-top:2.5rem;">
             <h3 class="section-title">Performance Matrix</h3>
@@ -2886,9 +2881,6 @@ def main():
             perf_html += "</tbody></table></div>"
             st.markdown(perf_html, unsafe_allow_html=True)
 
-        # ════════════════════════════════════════════════════
-        # 3) CRITICAL / CAUTION PERIODS
-        # ════════════════════════════════════════════════════
         st.markdown("""
         <div class="section-header" style="margin-top:2.5rem;">
             <h3 class="section-title">Critical / Caution Periods</h3>
@@ -2985,6 +2977,826 @@ def main():
             cm_alert = df_cm_data[df_cm_data['Status_CM'].isin(['Critical', 'Caution'])][['Date', 'TWB_CM', 'CM_WB', 'Dev_CM_Relatif_Pct', 'Status_CM']].copy() if len(df_cm_data) > 0 else pd.DataFrame()
             st.markdown(render_alert_table(cm_alert, ['Date', 'TWB_CM', 'CM_WB', 'Dev_CM_Relatif_Pct', 'Status_CM'], 'Dev_CM_Relatif_Pct', 'Status_CM'), unsafe_allow_html=True)
 
+        # ══════════════════════════════════════════════════════════
+        # EXPORT REPORTS
+        # ══════════════════════════════════════════════════════════
+        st.markdown("""
+        <div class="section-header">
+            <h3 class="section-title"> Export Reports</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+        chart_theme_export = dict(
+            font=dict(family='Inter, Arial, sans-serif', color='#E2E8F0', size=12),
+            plot_bgcolor='#1E293B',
+            paper_bgcolor='#1E293B',
+            margin=dict(l=60, r=40, t=55, b=45),
+            hovermode='x unified'
+        )
+        chart_theme_st = dict(
+            font=dict(family='Inter, Arial, sans-serif', color='#E2E8F0', size=11),
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=50, r=30, t=50, b=40),
+            hovermode='x unified'
+        )
+        axis_style = dict(
+            gridcolor='rgba(148,163,184,0.15)',
+            tickfont=dict(size=11, color='#CBD5E1'),
+            linecolor='rgba(148,163,184,0.25)',
+            showline=True,
+            title_font=dict(size=12, color='#CBD5E1')
+        )
+        legend_cfg = dict(
+            orientation='h',
+            yanchor='bottom',
+            y=1.02,
+            xanchor='right',
+            x=1,
+            font=dict(size=10, color='#CBD5E1'),
+            bgcolor='rgba(0,0,0,0)'
+        )
+
+        import textwrap
+
+        def fmt_period_label(value):
+            try:
+                return pd.to_datetime(value).strftime("%d %b %Y")
+            except Exception:
+                return str(value)
+
+        latest_flow = None
+        latest_period_label = "-"
+        if flow is not None and len(flow) > 0:
+            latest_flow = flow.sort_values("Date").iloc[-1]
+            latest_period_label = fmt_period_label(latest_flow["Date"])
+
+        stage_meta = {
+            "OB": {
+                "avg_dev": float(ob_disp_dev),
+                "critical": int(matrix.iloc[0]["Critical"]) if len(matrix) > 0 else 0,
+                "caution": int(matrix.iloc[0]["Caution"]) if len(matrix) > 0 else 0,
+                "normal": int(matrix.iloc[0]["Normal"]) if len(matrix) > 0 else 0,
+                "total": int(matrix.iloc[0]["Total"]) if len(matrix) > 0 else 0,
+            },
+            "CH": {
+                "avg_dev": float(ch_disp_dev),
+                "critical": int(matrix.iloc[1]["Critical"]) if len(matrix) > 1 else 0,
+                "caution": int(matrix.iloc[1]["Caution"]) if len(matrix) > 1 else 0,
+                "normal": int(matrix.iloc[1]["Normal"]) if len(matrix) > 1 else 0,
+                "total": int(matrix.iloc[1]["Total"]) if len(matrix) > 1 else 0,
+            },
+            "CM": {
+                "avg_dev": float(cm_disp_dev),
+                "critical": int(matrix.iloc[2]["Critical"]) if len(matrix) > 2 else 0,
+                "caution": int(matrix.iloc[2]["Caution"]) if len(matrix) > 2 else 0,
+                "normal": int(matrix.iloc[2]["Normal"]) if len(matrix) > 2 else 0,
+                "total": int(matrix.iloc[2]["Total"]) if len(matrix) > 2 else 0,
+            },
+        }
+
+        def kpi_color(value):
+            if value <= 2:
+                return "#22C55E"
+            if value <= 3:
+                return "#F59E0B"
+            return "#EF4444"
+
+        def stage_note(stage):
+            if stage == "OB":
+                return "Review JS vs TC and survey consistency"
+            if stage == "CH":
+                return "Check WB CH, port stock movement, and shipment timing"
+            return "Check WB CM, CPP stock movement, and survey / density inputs"
+
+        def collect_top_alerts(limit=8):
+            rows = []
+
+            for _, r in df_ob[df_ob["Status"].isin(["Critical", "Caution"])].iterrows():
+                rows.append({
+                    "Priority": 0 if r["Status"] == "Critical" else 1,
+                    "Stage": "OB",
+                    "Period": str(r["Bulan"]),
+                    "Deviation": abs(float(r["Dev_Relatif_Pct"])),
+                    "DeviationLabel": f'{float(r["Dev_Relatif_Pct"]):+.2f}%',
+                    "Status": r["Status"],
+                    "Metric": "JS vs TC",
+                    "Action": stage_note("OB"),
+                })
+
+            if len(df_ch) > 0:
+                for _, r in df_ch[df_ch["Status_CH"].isin(["Critical", "Caution"])].iterrows():
+                    rows.append({
+                        "Priority": 0 if r["Status_CH"] == "Critical" else 1,
+                        "Stage": "CH",
+                        "Period": fmt_period_label(r["Date"]),
+                        "Deviation": abs(float(r["Dev_CH_Relatif_Pct"])),
+                        "DeviationLabel": f'{float(r["Dev_CH_Relatif_Pct"]):+.2f}%',
+                        "Status": r["Status_CH"],
+                        "Metric": "TWB CH vs WB",
+                        "Action": stage_note("CH"),
+                    })
+
+            if len(df_cm_data) > 0:
+                for _, r in df_cm_data[df_cm_data["Status_CM"].isin(["Critical", "Caution"])].iterrows():
+                    rows.append({
+                        "Priority": 0 if r["Status_CM"] == "Critical" else 1,
+                        "Stage": "CM",
+                        "Period": fmt_period_label(r["Date"]),
+                        "Deviation": abs(float(r["Dev_CM_Relatif_Pct"])),
+                        "DeviationLabel": f'{float(r["Dev_CM_Relatif_Pct"]):+.2f}%',
+                        "Status": r["Status_CM"],
+                        "Metric": "TWB CM vs WB",
+                        "Action": stage_note("CM"),
+                    })
+
+            if not rows:
+                return pd.DataFrame(columns=[
+                    "Stage", "Period", "Deviation", "DeviationLabel",
+                    "Status", "Metric", "Action"
+                ])
+
+            alerts_df = pd.DataFrame(rows)
+            alerts_df = alerts_df.sort_values(
+                ["Priority", "Deviation"],
+                ascending=[True, False]
+            ).drop(columns=["Priority"]).reset_index(drop=True)
+
+            return alerts_df.head(limit)
+
+        top_alerts = collect_top_alerts(limit=8)
+
+        def build_key_findings():
+            findings = []
+
+            worst_stage = max(stage_meta.keys(), key=lambda k: stage_meta[k]["avg_dev"])
+            findings.append(
+                f"{worst_stage} menjadi fokus utama dengan average deviation "
+                f"{stage_meta[worst_stage]['avg_dev']:.2f}% dan "
+                f"{stage_meta[worst_stage]['critical']} periode critical."
+            )
+
+            findings.append(
+                f"Overall performance saat ini {perf:.1f}%, sehingga prioritas utama adalah "
+                f"menurunkan exception pada CH dan menjaga CM tetap di bawah threshold 3%."
+            )
+
+            if latest_flow is not None:
+                dominant_dev_name = "Port" if abs(float(latest_flow["Deviation Port"])) >= abs(float(latest_flow["Deviation CPP"])) else "CPP33"
+                dominant_dev_value = float(latest_flow["Deviation Port"]) if dominant_dev_name == "Port" else float(latest_flow["Deviation CPP"])
+                findings.append(
+                    f"Snapshot {latest_period_label}: deviation terbesar berada di {dominant_dev_name} "
+                    f"sebesar {dominant_dev_value:,.0f} ton, dengan CH ratio {float(latest_flow['CH Flow Ratio (%)']):.1f}% "
+                    f"dan Sales ratio {float(latest_flow['Sales Flow Ratio (%)']):.1f}%."
+                )
+            else:
+                findings.append(
+                    "Belum ada snapshot flow yang tersedia untuk dihitung dari data CH/CM."
+                )
+
+            return findings
+
+        key_findings = build_key_findings()
+
+        def build_recommended_actions():
+            actions = []
+
+            if ch_disp_dev > 3:
+                actions.append("Prioritaskan audit Coal Hauling: validasi WB CH, port stock movement, dan timing shipment pada periode critical.")
+            elif ch_disp_dev > 2:
+                actions.append("Coal Hauling masih caution: lakukan review berkala pada periode dengan deviasi mendekati 3%.")
+
+            if cm_disp_dev > 2:
+                actions.append("Review Coal Mining / CPP33: cek konsistensi WB CM, perubahan stok CPP, dan input survey / densitas.")
+
+            if latest_flow is not None and abs(float(latest_flow["Deviation Port"])) > abs(float(latest_flow["Deviation CPP"])):
+                actions.append("Fokus investigasi tambahan di Port karena deviation snapshot terbaru lebih dominan dibanding CPP33.")
+            else:
+                actions.append("Fokus investigasi tambahan di CPP33 bila deviation snapshot terbaru lebih dominan di hulu.")
+
+            if ob_disp_dev > 2:
+                actions.append("Untuk Overburden, validasi kembali JS vs TC pada bulan-bulan exception agar deviasi kembali ke rentang normal.")
+
+            return actions[:4]
+
+        recommended_actions = build_recommended_actions()
+
+        def make_fig_stage_summary(theme):
+            order = sorted(
+                [("Coal Hauling (CH)", ch_disp_dev), ("Coal Mining (CM)", cm_disp_dev), ("Overburden (OB)", ob_disp_dev)],
+                key=lambda x: x[1],
+                reverse=True
+            )
+            labels = [x[0] for x in order]
+            values = [x[1] for x in order]
+            colors = [kpi_color(v) for v in values]
+
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=values,
+                y=labels,
+                orientation="h",
+                marker=dict(color=colors),
+                text=[f"{v:.2f}%" for v in values],
+                textposition="outside",
+                hovertemplate="<b>%{y}</b><br>Avg Dev: %{x:.2f}%<extra></extra>"
+            ))
+            fig.add_vline(x=2, line_dash="dash", line_color="#F59E0B", line_width=1)
+            fig.add_vline(x=3, line_dash="dash", line_color="#EF4444", line_width=1)
+
+            fig.update_layout(
+                **theme,
+                height=360,
+                showlegend=False,
+                title=dict(text="Average Deviation by Stage", font=dict(size=16, color="#F1F5F9")),
+                xaxis=dict(**axis_style, title="Average |Deviation| (%)", zeroline=False, range=[0, max(5, max(values) + 1)]),
+                yaxis=dict(**axis_style, title="", categoryorder="array", categoryarray=labels[::-1]),
+            )
+            return fig
+
+        def make_fig_dev_timeline(theme):
+            fig = go.Figure()
+
+            ch_plot = df_ch.sort_values("Date").tail(12) if len(df_ch) > 0 else pd.DataFrame()
+            cm_plot = df_cm_data.sort_values("Date").tail(12) if len(df_cm_data) > 0 else pd.DataFrame()
+
+            if len(ch_plot) > 0:
+                fig.add_trace(go.Scatter(
+                    x=ch_plot["Date"],
+                    y=ch_plot["Dev_CH_Relatif_Pct"],
+                    mode="lines+markers",
+                    name="CH Dev",
+                    line=dict(color="#EF4444", width=2.5),
+                    marker=dict(size=7, color="#EF4444"),
+                    hovertemplate="<b>CH</b><br>%{x|%d %b %Y}<br>%{y:.2f}%<extra></extra>"
+                ))
+
+            if len(cm_plot) > 0:
+                fig.add_trace(go.Scatter(
+                    x=cm_plot["Date"],
+                    y=cm_plot["Dev_CM_Relatif_Pct"],
+                    mode="lines+markers",
+                    name="CM Dev",
+                    line=dict(color="#60A5FA", width=2.5),
+                    marker=dict(size=7, color="#60A5FA"),
+                    hovertemplate="<b>CM</b><br>%{x|%d %b %Y}<br>%{y:.2f}%<extra></extra>"
+                ))
+
+            for yv, clr in [(2, "#F59E0B"), (3, "#EF4444"), (-2, "#F59E0B"), (-3, "#EF4444")]:
+                fig.add_hline(y=yv, line_dash="dash", line_color=clr, line_width=1)
+
+            fig.update_layout(
+                **theme,
+                height=360,
+                title=dict(text="Deviation Trend (Last 12 Periods)", font=dict(size=16, color="#F1F5F9")),
+                xaxis=dict(**axis_style, title="Period", tickformat="%d %b"),
+                yaxis=dict(**axis_style, title="Deviation (%)", zeroline=False),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(size=10, color="#E2E8F0"),
+                    bgcolor="rgba(0,0,0,0)"
+                ),
+            )
+            return fig
+
+        def make_fig_latest_flow(theme):
+            fig = go.Figure()
+
+            if latest_flow is not None:
+                cats = ["CM TWB", "CH TWB", "Sales"]
+                vals = [
+                    float(latest_flow["CM TWB"]),
+                    float(latest_flow["CH TWB"]),
+                    float(latest_flow["Sales"]),
+                ]
+                cols = ["#60A5FA", "#34D399", "#A78BFA"]
+
+                fig.add_trace(go.Bar(
+                    x=cats,
+                    y=vals,
+                    marker=dict(color=cols),
+                    text=[f"{v:,.0f}" for v in vals],
+                    textposition="outside",
+                    hovertemplate="<b>%{x}</b><br>%{y:,.0f} ton<extra></extra>"
+                ))
+
+                fig.add_annotation(
+                    x=0.5, y=1.16, xref="paper", yref="paper",
+                    text=(
+                        f"Latest period: {latest_period_label}"
+                        f"<br>Δ CPP: {float(latest_flow['Delta CPP Stock']):,.0f} ton"
+                        f" · Dev CPP: {float(latest_flow['Deviation CPP']):,.0f} ton"
+                        f"<br>Δ Port: {float(latest_flow['Delta Port Stock']):,.0f} ton"
+                        f" · Dev Port: {float(latest_flow['Deviation Port']):,.0f} ton"
+                    ),
+                    showarrow=False,
+                    font=dict(size=11, color="#CBD5E1"),
+                    align="center"
+                )
+
+            fig.update_layout(
+                **theme,
+                height=360,
+                showlegend=False,
+                title=dict(text="Latest Reconciliation Snapshot", font=dict(size=16, color="#F1F5F9")),
+                xaxis=dict(**axis_style, title="Flow"),
+                yaxis=dict(**axis_style, title="Ton", zeroline=False),
+                margin=dict(l=60, r=40, t=95, b=55)
+            )
+            return fig
+
+        def make_fig_ratio_trend(theme):
+            fig = go.Figure()
+
+            if flow is not None and len(flow) > 0:
+                ratio_plot = flow.sort_values("Date").tail(12)
+
+                fig.add_trace(go.Scatter(
+                    x=ratio_plot["Date"],
+                    y=ratio_plot["CH Flow Ratio (%)"],
+                    mode="lines+markers",
+                    name="CH Ratio",
+                    line=dict(color="#34D399", width=2.5),
+                    marker=dict(size=6, color="#34D399"),
+                    hovertemplate="<b>CH Ratio</b><br>%{x|%d %b %Y}<br>%{y:.1f}%<extra></extra>"
+                ))
+
+                fig.add_trace(go.Scatter(
+                    x=ratio_plot["Date"],
+                    y=ratio_plot["Sales Flow Ratio (%)"],
+                    mode="lines+markers",
+                    name="Sales Ratio",
+                    line=dict(color="#60A5FA", width=2.5, dash="dot"),
+                    marker=dict(size=6, color="#60A5FA"),
+                    hovertemplate="<b>Sales Ratio</b><br>%{x|%d %b %Y}<br>%{y:.1f}%<extra></extra>"
+                ))
+
+            fig.add_hline(y=100, line_dash="dash", line_color="#F59E0B", line_width=1.2)
+
+            fig.update_layout(
+                **theme,
+                height=360,
+                title=dict(text="Flow Ratio Trend (Last 12 Periods)", font=dict(size=16, color="#F1F5F9")),
+                xaxis=dict(**axis_style, title="Period", tickformat="%d %b"),
+                yaxis=dict(**axis_style, title="Flow Ratio (%)", zeroline=False),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(size=10, color="#E2E8F0"),
+                    bgcolor="rgba(0,0,0,0)"
+                ),
+            )
+            return fig
+
+        # WAJIB ADA SEBELUM with exp1/exp2/exp3
+        exp1, exp2, exp3 = st.columns(3)
+
+        with exp1:
+            st.markdown("""
+            <div style="background:rgba(22,101,52,0.08);padding:10px 12px;border-radius:8px;
+                border-left:3px solid #16A34A;margin-bottom:8px;">
+                <div style="font-size:0.82rem;font-weight:700;color:#e5e7eb;">📊 Professional Excel Report</div>
+                <div style="font-size:0.72rem;color:#94A3B8;margin-top:2px;">Executive summary + focused flow/deviation export</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+            from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
+            from openpyxl.utils import get_column_letter
+
+            excel_buffer = io.BytesIO()
+
+            C = {
+                'kpp_dk': '166534', 'kpp_md': '16A34A', 'kpp_lt': 'DCFCE7', 'kpp_bg': 'F0FDF4',
+                'gold_md': 'D97706',
+                'gray1': '1F2937', 'gray2': '6B7280', 'gray3': 'F3F4F6',
+                'green_txt': '059669', 'green_bg': 'D1FAE5',
+                'amber_txt': 'D97706', 'amber_bg': 'FEF3C7',
+                'red_txt': 'DC2626', 'red_bg': 'FEE2E2',
+                'white': 'FFFFFF', 'bdr': 'D1D5DB',
+            }
+
+            hf = Font(bold=True, color=C['white'], size=10)
+            bd = Border(
+                left=Side(style='thin', color=C['bdr']), right=Side(style='thin', color=C['bdr']),
+                top=Side(style='thin', color=C['bdr']), bottom=Side(style='thin', color=C['bdr'])
+            )
+            al_c = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            al_l = Alignment(horizontal='left', vertical='center', wrap_text=True)
+            af = PatternFill(start_color=C['kpp_bg'], end_color=C['kpp_bg'], fill_type='solid')
+
+            sfill = {
+                'Normal': PatternFill(start_color=C['green_bg'], end_color=C['green_bg'], fill_type='solid'),
+                'Good': PatternFill(start_color=C['green_bg'], end_color=C['green_bg'], fill_type='solid'),
+                'Caution': PatternFill(start_color=C['amber_bg'], end_color=C['amber_bg'], fill_type='solid'),
+                'Warning': PatternFill(start_color=C['amber_bg'], end_color=C['amber_bg'], fill_type='solid'),
+                'Critical': PatternFill(start_color=C['red_bg'], end_color=C['red_bg'], fill_type='solid'),
+            }
+            sfont = {
+                'Normal': C['green_txt'], 'Good': C['green_txt'],
+                'Caution': C['amber_txt'], 'Warning': C['amber_txt'],
+                'Critical': C['red_txt'],
+            }
+
+            def style_data_sheet(ws, title_text, hdr_row, data_start_row, merge_cols,
+                                 status_col_idx=None, freeze_cell='A2',
+                                 num_fmt_cols=None, pct_fmt_cols=None):
+                ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=merge_cols)
+                ws['A1'] = title_text
+                ws['A1'].font = Font(size=14, bold=True, color=C['white'])
+                ws['A1'].fill = PatternFill(start_color=C['kpp_dk'], end_color=C['kpp_dk'], fill_type='solid')
+                ws['A1'].alignment = al_c
+                ws.row_dimensions[1].height = 30
+
+                for col in range(1, merge_cols + 1):
+                    cell = ws.cell(row=hdr_row, column=col)
+                    cell.font = hf
+                    cell.fill = PatternFill(start_color=C['kpp_md'], end_color=C['kpp_md'], fill_type='solid')
+                    cell.alignment = al_c
+                    cell.border = bd
+
+                for ri, row in enumerate(ws.iter_rows(min_row=data_start_row, max_row=ws.max_row, max_col=merge_cols)):
+                    for cell in row:
+                        cell.border = bd
+                        cell.alignment = al_c
+                        if ri % 2 == 1:
+                            cell.fill = af
+                        if status_col_idx and cell.column == status_col_idx:
+                            sv = str(cell.value) if cell.value else ''
+                            if sv in sfill:
+                                cell.fill = sfill[sv]
+                                cell.font = Font(bold=True, size=9, color=sfont.get(sv, C['gray1']))
+                        if num_fmt_cols and cell.column in num_fmt_cols:
+                            cell.number_format = '#,##0'
+                        if pct_fmt_cols and cell.column in pct_fmt_cols:
+                            cell.number_format = '0.00'
+
+                for ci in range(1, merge_cols + 1):
+                    ml = 0
+                    for row in ws.iter_rows(min_col=ci, max_col=ci):
+                        for cell in row:
+                            if cell.value:
+                                ml = max(ml, len(str(cell.value)[:40]))
+                    ws.column_dimensions[get_column_letter(ci)].width = max(min(ml + 3, 22), 10)
+
+                ws.freeze_panes = freeze_cell
+
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                ed = []
+                ed.append(['KPP MINING — EXECUTIVE DEVIATION REPORT', '', '', '', '', '', ''])
+                ed.append([f'PT Kalimantan Prima Persada | Generated: {datetime.now().strftime("%d %b %Y, %H:%M")}', '', '', '', '', '', ''])
+                ed.append(['', '', '', '', '', '', ''])
+                ed.append(['KEY PERFORMANCE INDICATORS', '', '', '', '', '', ''])
+                ed.append(['Overall Perf', 'Total Periods', 'Critical Alerts', 'CH Ratio', 'OB Avg Dev', 'CH Avg Dev', 'CM Avg Dev'])
+                ed.append([
+                    round(perf, 1), total_all,
+                    total_critical, round(disp_ch_ratio, 1),
+                    round(ob_disp_dev, 2), round(ch_disp_dev, 2), round(cm_disp_dev, 2)
+                ])
+                ed.append(['', '', '', '', '', '', ''])
+                ed.append(['FLOW SNAPSHOT', 'Value', '', '', 'LATEST PERIOD', latest_period_label, ''])
+                if latest_flow is not None:
+                    ed.append(['CM TWB', round(float(latest_flow['CM TWB'])), '', '', 'CH TWB', round(float(latest_flow['CH TWB'])), ''])
+                    ed.append(['Sales', round(float(latest_flow['Sales'])), '', '', 'Δ CPP Stock', round(float(latest_flow['Delta CPP Stock'])), ''])
+                    ed.append(['Δ Port Stock', round(float(latest_flow['Delta Port Stock'])), '', '', 'Dev CPP', round(float(latest_flow['Deviation CPP'])), ''])
+                    ed.append(['Dev Port', round(float(latest_flow['Deviation Port'])), '', '', 'Sales Ratio', round(float(latest_flow['Sales Flow Ratio (%)']), 1), ''])
+                else:
+                    ed.append(['No flow data', '', '', '', '', '', ''])
+
+                pd.DataFrame(ed).to_excel(writer, sheet_name='Executive Dashboard', index=False, header=False)
+
+                df_ob_exp = df_ob[['Bulan','TC','JS','Dev_Absolut','Dev_Relatif_Pct','Status']].copy()
+                df_ob_exp['Dev_Relatif_Pct'] = df_ob_exp['Dev_Relatif_Pct'].round(2)
+                df_ob_exp['Dev_Absolut'] = df_ob_exp['Dev_Absolut'].round(0)
+                df_ob_exp.columns = ['Month', 'TC (BCM)', 'JS (BCM)', 'Dev (Absolute)', 'Dev (%)', 'Status']
+                df_ob_exp.to_excel(writer, sheet_name='OB Analysis', index=False, startrow=2)
+
+                df_ch_exp = df_ch_cm.dropna(subset=['CH_WB','TWB_CH']).copy()
+                ch_cols = [c for c in ['Date','Port_Darat','Port_Laut','Port_Total','CH_WB','TWB_CH','Dev_CH_Relatif_Pct','Status_CH'] if c in df_ch_exp.columns]
+                df_ch_exp = df_ch_exp[ch_cols].copy()
+                if 'Dev_CH_Relatif_Pct' in df_ch_exp.columns:
+                    df_ch_exp['Dev_CH_Relatif_Pct'] = df_ch_exp['Dev_CH_Relatif_Pct'].round(2)
+                if 'Date' in df_ch_exp.columns:
+                    df_ch_exp['Date'] = pd.to_datetime(df_ch_exp['Date']).dt.strftime('%Y-%m-%d')
+                col_map_ch = {'Date':'Date','Port_Darat':'Port Darat','Port_Laut':'Port Laut','Port_Total':'Port Total','CH_WB':'WB Target','TWB_CH':'TWB Actual','Dev_CH_Relatif_Pct':'Dev (%)','Status_CH':'Status'}
+                df_ch_exp.columns = [col_map_ch.get(c, c) for c in ch_cols]
+                df_ch_exp.to_excel(writer, sheet_name='CH Analysis', index=False, startrow=2)
+
+                df_cm_exp = df_ch_cm.dropna(subset=['CM_WB','TWB_CM']).copy()
+                cm_cols = [c for c in ['Date','CPP_Raw','CPP_Product','CPP_Total','Sales','CM_WB','TWB_CM','Dev_CM_Relatif_Pct','Status_CM'] if c in df_cm_exp.columns]
+                df_cm_exp = df_cm_exp[cm_cols].copy()
+                if 'Dev_CM_Relatif_Pct' in df_cm_exp.columns:
+                    df_cm_exp['Dev_CM_Relatif_Pct'] = df_cm_exp['Dev_CM_Relatif_Pct'].round(2)
+                if 'Date' in df_cm_exp.columns:
+                    df_cm_exp['Date'] = pd.to_datetime(df_cm_exp['Date']).dt.strftime('%Y-%m-%d')
+                col_map_cm = {'Date':'Date','CPP_Raw':'CPP Raw','CPP_Product':'CPP Product','CPP_Total':'CPP Total','Sales':'Sales','CM_WB':'WB Target','TWB_CM':'TWB Actual','Dev_CM_Relatif_Pct':'Dev (%)','Status_CM':'Status'}
+                df_cm_exp.columns = [col_map_cm.get(c, c) for c in cm_cols]
+                df_cm_exp.to_excel(writer, sheet_name='CM Analysis', index=False, startrow=2)
+
+                if flow is not None and len(flow) > 0:
+                    df_fl = flow.copy()
+                    fl_cols = [c for c in [
+                        'Date','CM TWB','Delta CPP Stock','CH TWB','Deviation CPP',
+                        'Delta Port Stock','Sales','Deviation Port',
+                        'CH Flow Ratio (%)','Sales Flow Ratio (%)','Net Deviation'
+                    ] if c in df_fl.columns]
+                    df_fl = df_fl[fl_cols].copy()
+                    if 'Date' in df_fl.columns:
+                        df_fl['Date'] = pd.to_datetime(df_fl['Date']).dt.strftime('%Y-%m-%d')
+                    for ec in ['CH Flow Ratio (%)','Sales Flow Ratio (%)']:
+                        if ec in df_fl.columns:
+                            df_fl[ec] = df_fl[ec].round(1)
+                    for lc in ['Deviation CPP','Deviation Port','Net Deviation','Delta CPP Stock','Delta Port Stock']:
+                        if lc in df_fl.columns:
+                            df_fl[lc] = df_fl[lc].round(0)
+                    rename_fl = {
+                        'CM TWB':'CM TWB',
+                        'Delta CPP Stock':'Δ CPP Stock',
+                        'CH TWB':'CH TWB',
+                        'Deviation CPP':'Dev CPP',
+                        'Delta Port Stock':'Δ Port Stock',
+                        'Sales':'Sales',
+                        'Deviation Port':'Dev Port',
+                        'CH Flow Ratio (%)':'CH Ratio (%)',
+                        'Sales Flow Ratio (%)':'Sales Ratio (%)',
+                        'Net Deviation':'Net Deviation'
+                    }
+                    df_fl = df_fl.rename(columns=rename_fl)
+                    df_fl.to_excel(writer, sheet_name='Material Flow', index=False, startrow=2)
+
+                df_mx = matrix.copy()
+                df_mx.columns = ['Stage', 'Normal', 'Caution', 'Critical', 'Total', 'Avg Dev (%)']
+                df_mx['Avg Dev (%)'] = df_mx['Avg Dev (%)'].round(2)
+                total_row = pd.DataFrame([{
+                    'Stage': 'TOTAL',
+                    'Normal': df_mx['Normal'].sum(),
+                    'Caution': df_mx['Caution'].sum(),
+                    'Critical': df_mx['Critical'].sum(),
+                    'Total': df_mx['Total'].sum(),
+                    'Avg Dev (%)': round(df_mx['Avg Dev (%)'].mean(), 2)
+                }])
+                df_mx = pd.concat([df_mx, total_row], ignore_index=True)
+                df_mx.to_excel(writer, sheet_name='Performance Matrix', index=False, startrow=2)
+
+                if not top_alerts.empty:
+                    top_alerts.to_excel(writer, sheet_name='Top Exceptions', index=False, startrow=2)
+
+            excel_buffer.seek(0)
+            st.download_button(
+                label="Download Excel Report",
+                data=excel_buffer.getvalue(),
+                file_name=f"KPP_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key='dl_excel',
+                use_container_width=True
+            )
+
+        with exp2:
+            st.markdown("""
+            <div style="background:rgba(34,197,94,0.06);padding:10px 12px;border-radius:8px;
+                border-left:3px solid #22C55E;margin-bottom:8px;">
+                <div style="font-size:0.82rem;font-weight:700;color:#e5e7eb;"> HTML Report</div>
+                <div style="font-size:0.72rem;color:#94A3B8;margin-top:2px;">Executive summary + exceptions + focused charts</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            fig_stage = make_fig_stage_summary(chart_theme_st)
+            fig_dev = make_fig_dev_timeline(chart_theme_st)
+            fig_flow = make_fig_latest_flow(chart_theme_st)
+            fig_ratio = make_fig_ratio_trend(chart_theme_st)
+
+            f_stage = fig_stage.to_html(full_html=False, include_plotlyjs=False)
+            f_dev = fig_dev.to_html(full_html=False, include_plotlyjs=False)
+            f_flow = fig_flow.to_html(full_html=False, include_plotlyjs=False)
+            f_ratio = fig_ratio.to_html(full_html=False, include_plotlyjs=False)
+
+            findings_html = "".join(
+                f'<li><span class="bullet-dot"></span><span>{item}</span></li>'
+                for item in key_findings
+            )
+
+            actions_html = "".join(
+                f'<li><span class="bullet-dot"></span><span>{item}</span></li>'
+                for item in recommended_actions
+            )
+
+            if top_alerts.empty:
+                alert_rows_html = """
+                <tr>
+                    <td colspan="5" style="padding:16px;text-align:center;color:#94A3B8;">No critical / caution periods found.</td>
+                </tr>
+                """
+            else:
+                alert_rows_html = ""
+                for _, r in top_alerts.head(8).iterrows():
+                    status_color = "#EF4444" if r["Status"] == "Critical" else "#F59E0B"
+                    badge_bg = "rgba(239,68,68,0.14)" if r["Status"] == "Critical" else "rgba(245,158,11,0.14)"
+                    alert_rows_html += f"""
+                    <tr>
+                        <td>{r["Stage"]}</td>
+                        <td>{r["Period"]}</td>
+                        <td style="font-weight:700;color:{status_color};">{r["DeviationLabel"]}</td>
+                        <td><span class="status-badge" style="background:{badge_bg};color:{status_color};">{r["Status"]}</span></td>
+                        <td>{r["Metric"]}</td>
+                    </tr>
+                    """
+
+            latest_cards_html = ""
+            if latest_flow is not None:
+                latest_cards = [
+                    ("CM TWB", f'{float(latest_flow["CM TWB"]):,.0f} ton', "#60A5FA"),
+                    ("CH TWB", f'{float(latest_flow["CH TWB"]):,.0f} ton', "#34D399"),
+                    ("Sales", f'{float(latest_flow["Sales"]):,.0f} ton', "#A78BFA"),
+                    ("Δ CPP", f'{float(latest_flow["Delta CPP Stock"]):,.0f} ton', "#F59E0B"),
+                    ("Δ Port", f'{float(latest_flow["Delta Port Stock"]):,.0f} ton', "#F59E0B"),
+                    ("Dev CPP", f'{float(latest_flow["Deviation CPP"]):,.0f} ton', "#EF4444"),
+                    ("Dev Port", f'{float(latest_flow["Deviation Port"]):,.0f} ton', "#EF4444"),
+                    ("CH Ratio", f'{float(latest_flow["CH Flow Ratio (%)"]):.1f}%', "#22C55E"),
+                    ("Sales Ratio", f'{float(latest_flow["Sales Flow Ratio (%)"]):.1f}%', "#60A5FA"),
+                ]
+                latest_cards_html = "".join(
+                    f'<div class="mini-card"><div class="mini-label">{lb}</div><div class="mini-value" style="color:{cl};">{vl}</div></div>'
+                    for lb, vl, cl in latest_cards
+                )
+
+            html_report = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KPP Executive Deviation Report {report_date}</title>
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0}}
+.wrap{{max-width:1440px;margin:0 auto;padding:28px}}
+.hero{{background:linear-gradient(135deg,#0F172A,#172554);border:1px solid rgba(148,163,184,0.12);border-radius:18px;padding:28px 30px;margin-bottom:22px}}
+.hero h1{{font-size:2rem;font-weight:900;color:#F8FAFC;margin-bottom:6px}}
+.hero .sub{{color:#22C55E;font-size:0.95rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}}
+.hero .meta{{margin-top:10px;color:#94A3B8;font-size:0.9rem}}
+
+.kpi-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px}}
+.kpi-card{{background:#162235;border:1px solid rgba(148,163,184,0.12);border-radius:16px;padding:20px 18px;position:relative;overflow:hidden}}
+.kpi-card::before{{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--ac)}}
+.kpi-label{{font-size:0.78rem;color:#94A3B8;text-transform:uppercase;letter-spacing:.08em;font-weight:700}}
+.kpi-value{{font-size:2rem;font-weight:900;color:#F8FAFC;margin-top:10px}}
+.kpi-status{{font-size:0.9rem;font-weight:700;margin-top:6px}}
+.kpi-note{{font-size:0.78rem;color:#64748B;margin-top:8px}}
+
+.grid-2{{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;margin-bottom:18px}}
+.grid-2-eq{{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}}
+.panel{{background:#162235;border:1px solid rgba(148,163,184,0.12);border-radius:16px;padding:18px}}
+.panel h2{{font-size:1.05rem;color:#F8FAFC;font-weight:800;margin-bottom:14px}}
+.panel h3{{font-size:0.86rem;color:#94A3B8;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}}
+
+.finding-list,.action-list{{list-style:none;display:flex;flex-direction:column;gap:12px}}
+.finding-list li,.action-list li{{display:flex;gap:12px;align-items:flex-start;padding:12px 12px;background:rgba(15,23,42,0.55);border-radius:12px;border:1px solid rgba(148,163,184,0.08)}}
+.bullet-dot{{width:10px;height:10px;border-radius:999px;background:#22C55E;flex:0 0 auto;margin-top:6px}}
+
+.alert-table{{width:100%;border-collapse:collapse}}
+.alert-table th{{text-align:left;font-size:0.72rem;text-transform:uppercase;color:#94A3B8;padding:10px 8px;border-bottom:1px solid rgba(148,163,184,0.12)}}
+.alert-table td{{padding:11px 8px;border-bottom:1px solid rgba(148,163,184,0.08);font-size:0.9rem;color:#E2E8F0}}
+.status-badge{{display:inline-flex;padding:4px 10px;border-radius:999px;font-size:0.75rem;font-weight:800}}
+
+.mini-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}
+.mini-card{{background:rgba(15,23,42,0.55);border:1px solid rgba(148,163,184,0.08);border-radius:12px;padding:12px}}
+.mini-label{{font-size:0.72rem;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;font-weight:700}}
+.mini-value{{font-size:1.05rem;font-weight:800;margin-top:6px}}
+
+.chart-panel{{padding:12px 12px 4px 12px}}
+.chart-full{{margin-bottom:18px}}
+.footer{{margin-top:16px;padding-top:18px;border-top:1px solid rgba(148,163,184,0.12);text-align:center;color:#64748B;font-size:0.82rem}}
+
+@media (max-width: 1100px) {{
+  .kpi-grid{{grid-template-columns:repeat(2,1fr)}}
+  .grid-2,.grid-2-eq{{grid-template-columns:1fr}}
+  .mini-grid{{grid-template-columns:repeat(2,1fr)}}
+}}
+@media (max-width: 700px) {{
+  .kpi-grid{{grid-template-columns:1fr}}
+  .mini-grid{{grid-template-columns:1fr}}
+}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+    <div class="sub">PT Kalimantan Prima Persada</div>
+    <h1>Executive Deviation & Reconciliation Report</h1>
+    <div class="meta">Generated: {report_date} · Latest flow snapshot: {latest_period_label}</div>
+</div>
+
+<div class="kpi-grid">
+    <div class="kpi-card" style="--ac:{ob_clr}">
+        <div class="kpi-label">Overburden (OB)</div>
+        <div class="kpi-value">{ob_disp_dev:.2f}%</div>
+        <div class="kpi-status" style="color:{ob_clr};">{ob_lbl2}</div>
+        <div class="kpi-note">{stage_meta["OB"]["critical"]} critical · {stage_meta["OB"]["total"]} periods</div>
+    </div>
+    <div class="kpi-card" style="--ac:{ch_clr}">
+        <div class="kpi-label">Coal Hauling (CH)</div>
+        <div class="kpi-value">{ch_disp_dev:.2f}%</div>
+        <div class="kpi-status" style="color:{ch_clr};">{ch_lbl2}</div>
+        <div class="kpi-note">{stage_meta["CH"]["critical"]} critical · {stage_meta["CH"]["total"]} periods</div>
+    </div>
+    <div class="kpi-card" style="--ac:{cm_clr}">
+        <div class="kpi-label">Coal Mining (CM)</div>
+        <div class="kpi-value">{cm_disp_dev:.2f}%</div>
+        <div class="kpi-status" style="color:{cm_clr};">{cm_lbl2}</div>
+        <div class="kpi-note">{stage_meta["CM"]["critical"]} critical · {stage_meta["CM"]["total"]} periods</div>
+    </div>
+    <div class="kpi-card" style="--ac:{'#22C55E' if perf >= 70 else '#F59E0B' if perf >= 50 else '#EF4444'}">
+        <div class="kpi-label">Overall Performance</div>
+        <div class="kpi-value">{perf:.1f}%</div>
+        <div class="kpi-status" style="color:{'#22C55E' if perf >= 70 else '#F59E0B' if perf >= 50 else '#EF4444'};">{'Good' if perf >= 70 else 'Fair' if perf >= 50 else 'Poor'}</div>
+        <div class="kpi-note">CH Ratio {disp_ch_ratio:.1f}% · Sales Ratio {disp_sales_ratio:.1f}%</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="panel">
+        <h2>Key Findings</h2>
+        <ul class="finding-list">{findings_html}</ul>
+    </div>
+    <div class="panel">
+        <h2>Top Critical / Caution Periods</h2>
+        <table class="alert-table">
+            <thead>
+                <tr>
+                    <th>Stage</th>
+                    <th>Period</th>
+                    <th>Deviation</th>
+                    <th>Status</th>
+                    <th>Metric</th>
+                </tr>
+            </thead>
+            <tbody>
+                {alert_rows_html}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="grid-2-eq">
+    <div class="panel chart-panel">
+        <h2>Stage Summary</h2>
+        {f_stage}
+    </div>
+    <div class="panel chart-panel">
+        <h2>Latest Reconciliation Snapshot</h2>
+        {f_flow}
+    </div>
+</div>
+
+<div class="panel chart-panel chart-full">
+    <h2>Deviation Trend</h2>
+    {f_dev}
+</div>
+
+<div class="grid-2">
+    <div class="panel chart-panel">
+        <h2>Flow Ratio Trend</h2>
+        {f_ratio}
+    </div>
+    <div class="panel">
+        <h2>Latest Snapshot Metrics</h2>
+        <div class="mini-grid">
+            {latest_cards_html}
+        </div>
+        <div style="height:14px"></div>
+        <h2>Recommended Actions</h2>
+        <ul class="action-list">{actions_html}</ul>
+    </div>
+</div>
+
+<div class="footer">
+    PT Kalimantan Prima Persada — Mining Volume Deviation Monitoring System<br>
+    Report generated: {report_date}
+</div>
+
+</div>
+</body>
+</html>
+"""
+            html_bytes = html_report.encode("utf-8")
+            st.download_button(
+                label="Download HTML",
+                data=html_bytes,
+                file_name=f"KPP_Executive_Report_{datetime.now().strftime('%Y%m%d')}.html",
+                mime="text/html",
+                key="dl_html",
+                use_container_width=True
+            )
+
         with exp3:
             st.markdown("""
             <div style="background:rgba(22,101,52,0.08);padding:10px 12px;border-radius:8px;
@@ -3009,7 +3821,6 @@ def main():
                             from PIL import Image as PILImage
                             from PIL import ImageDraw, ImageFont
 
-                            # ===== FIGURES =====
                             png_theme = dict(
                                 font=dict(family="Inter, Arial, sans-serif", color="#E2E8F0", size=12),
                                 plot_bgcolor="#182332",
@@ -3022,7 +3833,6 @@ def main():
                             fig_dev_png = make_fig_dev_timeline(png_theme)
                             fig_flow_png = make_fig_latest_flow(png_theme)
 
-                            # ===== COLORS =====
                             BGCOLOR = (13, 20, 33)
                             PANEL = (22, 34, 53)
                             PANEL_ALT = (18, 29, 45)
@@ -3040,7 +3850,6 @@ def main():
                             W = 2200
                             PAD = 42
                             GAP = 18
-                            COL_GAP = 18
                             HEADER_H = 130
                             KPI_H = 150
                             INFO_H = 330
@@ -3110,14 +3919,6 @@ def main():
                                 draw.text((x+18, y+98), status, font=font_kpi_status, fill=accent)
                                 draw.text((x+18, y+123), note, font=font_small, fill=DARK)
 
-                            def status_fill(status):
-                                if status == "Critical":
-                                    return RED, (80, 24, 28)
-                                if status == "Caution":
-                                    return YELLOW, (85, 55, 18)
-                                return GREEN, (20, 60, 35)
-
-                            # ===== HEADER =====
                             y = PAD
                             rounded_box(PAD, y, CONTENT_W, HEADER_H, PANEL)
                             draw.text((PAD + 28, y + 24), "Executive Deviation & Reconciliation Report", font=font_title, fill=WHITE)
@@ -3125,7 +3926,6 @@ def main():
                             draw.text((W - PAD - 320, y + 32), f"Generated: {report_date}", font=font_sub, fill=MUTED)
                             draw.text((W - PAD - 320, y + 68), f"Latest snapshot: {latest_period_label}", font=font_sub, fill=MUTED)
 
-                            # ===== KPI ROW =====
                             y += HEADER_H + GAP
                             kpi_w = (CONTENT_W - 3 * GAP) // 4
 
@@ -3136,7 +3936,6 @@ def main():
                             perf_status = "Good" if perf >= 70 else "Fair" if perf >= 50 else "Poor"
                             kpi_card(PAD + 3 * (kpi_w + GAP), y, kpi_w, KPI_H, "Overall Performance", f"{perf:.1f}%", perf_status, f"CH Ratio {disp_ch_ratio:.1f}% · Sales Ratio {disp_sales_ratio:.1f}%", perf_accent)
 
-                            # ===== FINDINGS + ALERTS =====
                             y += KPI_H + GAP
                             left_w = int(CONTENT_W * 0.52)
                             right_w = CONTENT_W - left_w - GAP
@@ -3182,7 +3981,6 @@ def main():
                                         cx += width
                                     ty += 34
 
-                            # ===== CHART ROW 1 =====
                             y += INFO_H + GAP
                             chart_w = (CONTENT_W - GAP) // 2
                             chart_stage = fig_to_img(fig_stage_png, chart_w, CHART_H)
@@ -3193,13 +3991,11 @@ def main():
                             canvas.paste(chart_stage, (PAD, y))
                             canvas.paste(chart_flow, (PAD + chart_w + GAP, y))
 
-                            # ===== CHART ROW 2 =====
                             y += CHART_H + GAP
                             chart_dev = fig_to_img(fig_dev_png, CONTENT_W, CHART_H)
                             rounded_box(PAD, y, CONTENT_W, CHART_H, PANEL_ALT)
                             canvas.paste(chart_dev, (PAD, y))
 
-                            # ===== FOOTER SNAPSHOT =====
                             y += CHART_H + GAP
                             rounded_box(PAD, y, CONTENT_W, FOOT_H, PANEL)
                             snapshot_items = []

@@ -1495,7 +1495,7 @@ def main():
                             <div class="pipe-arrow-tip"></div>
                         </div>
                         <div class="pipe-conn-stats">
-                            <span class="pipe-loss-badge loss-val">Δ {format_large(disp_delta_cpp)}</span>
+                            <span class="pipe-loss-badge loss-val">Δ stok CPP33 {format_large(disp_delta_cpp)}</span>
                             <span class="pipe-loss-badge eff-val">Dev {format_large(disp_dev_cpp)}</span>
                         </div>
                     </div>
@@ -1510,7 +1510,7 @@ def main():
                             <div class="pipe-arrow-tip"></div>
                         </div>
                         <div class="pipe-conn-stats">
-                            <span class="pipe-loss-badge loss-val">Δ {format_large(disp_delta_port)}</span>
+                            <span class="pipe-loss-badge loss-val">Δ stok Port {format_large(disp_delta_port)}</span>
                             <span class="pipe-loss-badge eff-val">Dev {format_large(disp_dev_port)}</span>
                         </div>
                     </div>

@@ -1896,21 +1896,22 @@ def main():
             flow["Net Deviation"] = flow["Deviation CPP"] + flow["Deviation Port"]
             flow["Cum Net Deviation"] = flow["Net Deviation"].cumsum()
 
-            disp_net = flow["Net Deviation"].mean()
+            avg_cm_ref = flow["CM TWB"].mean() if len(flow) > 0 else 0
+            avg_net = flow["Net Deviation"].mean()
             std_loss = flow["Net Deviation"].std() if len(flow) > 1 else 0
             max_loss_val = flow["Net Deviation"].min()
             cum_total = flow["Cum Net Deviation"].iloc[-1]
-            critical_count = (flow["Net Deviation"].abs() > disp_cm * 0.02).sum()
+            critical_count = (flow["Net Deviation"].abs() > avg_cm_ref * 0.02).sum()
             total_periods = len(flow)
 
             lc1, lc2, lc3, lc4 = st.columns(4)
             with lc1:
-                net_color = '#22c55e' if abs(disp_net) <= disp_cm * 0.01 else '#f59e0b' if abs(disp_net) <= disp_cm * 0.02 else '#ef4444'
+                net_color = '#22c55e' if abs(avg_net) <= avg_cm_ref * 0.01 else '#f59e0b' if abs(avg_net) <= avg_cm_ref * 0.02 else '#ef4444'
                 st.markdown(f"""
                 <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                 border:1px solid rgba(148,163,184,0.1);text-align:center">
                     <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Avg Net Deviation</div>
-                    <div style="color:{net_color};font-size:1.1rem;font-weight:700">{disp_net:,.0f} t</div>
+                    <div style="color:{net_color};font-size:1.1rem;font-weight:700">{avg_net:,.0f} t</div>
                 </div>""", unsafe_allow_html=True)
             with lc2:
                 st.markdown(f"""
@@ -1920,7 +1921,7 @@ def main():
                     <div style="color:#ef4444;font-size:1.1rem;font-weight:700">{max_loss_val:,.0f} t</div>
                 </div>""", unsafe_allow_html=True)
             with lc3:
-                cum_color = '#22c55e' if abs(cum_total) <= disp_cm * 0.01 else '#f59e0b' if abs(cum_total) <= disp_cm * 0.02 else '#ef4444'
+                cum_color = '#22c55e' if abs(cum_total) <= avg_cm_ref * 0.01 else '#f59e0b' if abs(cum_total) <= avg_cm_ref * 0.02 else '#ef4444'
                 st.markdown(f"""
                 <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                 border:1px solid rgba(148,163,184,0.1);text-align:center">
@@ -1964,9 +1965,9 @@ def main():
             net_colors = []
             for v in flow["Net Deviation"].values:
                 abs_v = abs(v)
-                if abs_v <= abs(disp_net) + 1 * std_loss:
+                if abs_v <= abs(avg_net) + 1 * std_loss:
                     net_colors.append('#22C55E')
-                elif abs_v <= abs(disp_net) + 2 * std_loss:
+                elif abs_v <= abs(avg_net) + 2 * std_loss:
                     net_colors.append('#F59E0B')
                 else:
                     net_colors.append('#EF4444')

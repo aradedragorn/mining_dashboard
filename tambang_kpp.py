@@ -1883,8 +1883,8 @@ def main():
                 # ══════════════════════════════════════════════════════════
                 # MATERIAL LOSS ANALYSIS — Enhanced Stacked + Cumulative
                 # ══════════════════════════════════════════════════════════
-                 st.markdown("###  Reconciliation Deviation Analysis")
-
+                
+                st.markdown("###  Reconciliation Deviation Analysis")
 
                 flow['Net Deviation'] = flow['Deviation CPP'] + flow['Deviation Port']
                 flow['Cum Net Deviation'] = flow['Net Deviation'].cumsum()

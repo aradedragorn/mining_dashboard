@@ -3246,8 +3246,8 @@ def main():
             for yv, clr in [(2, "#F59E0B"), (3, "#EF4444"), (-2, "#F59E0B"), (-3, "#EF4444")]:
                 fig.add_hline(y=yv, line_dash="dash", line_color=clr, line_width=1)
 
-            fig.update_layout(
-                **theme,
+            layout_cfg = dict(theme)
+            layout_cfg.update({
                 height=360,
                 title=dict(text="Deviation Trend (Last 12 Periods)", font=dict(size=16, color="#F1F5F9")),
                 xaxis=dict(**axis_style, title="Period", tickformat="%d %b"),
@@ -3262,53 +3262,60 @@ def main():
                     bgcolor="rgba(0,0,0,0)"
                 ),
             )
+            
+            fig.update_layout(**layout_cfg)
             return fig
 
-        def make_fig_latest_flow(theme):
-            fig = go.Figure()
+def make_fig_latest_flow(theme):
+    fig = go.Figure()
 
-            if latest_flow is not None:
-                cats = ["CM TWB", "CH TWB", "Sales"]
-                vals = [
-                    float(latest_flow["CM TWB"]),
-                    float(latest_flow["CH TWB"]),
-                    float(latest_flow["Sales"]),
-                ]
-                cols = ["#60A5FA", "#34D399", "#A78BFA"]
+    if latest_flow is not None:
+        cats = ["CM TWB", "CH TWB", "Sales"]
+        vals = [
+            float(latest_flow["CM TWB"]),
+            float(latest_flow["CH TWB"]),
+            float(latest_flow["Sales"]),
+        ]
+        cols = ["#60A5FA", "#34D399", "#A78BFA"]
 
-                fig.add_trace(go.Bar(
-                    x=cats,
-                    y=vals,
-                    marker=dict(color=cols),
-                    text=[f"{v:,.0f}" for v in vals],
-                    textposition="outside",
-                    hovertemplate="<b>%{x}</b><br>%{y:,.0f} ton<extra></extra>"
-                ))
+        fig.add_trace(go.Bar(
+            x=cats,
+            y=vals,
+            marker=dict(color=cols),
+            text=[f"{v:,.0f}" for v in vals],
+            textposition="outside",
+            hovertemplate="<b>%{x}</b><br>%{y:,.0f} ton<extra></extra>"
+        ))
 
-                fig.add_annotation(
-                    x=0.5, y=1.16, xref="paper", yref="paper",
-                    text=(
-                        f"Latest period: {latest_period_label}"
-                        f"<br>Δ CPP: {float(latest_flow['Delta CPP Stock']):,.0f} ton"
-                        f" · Dev CPP: {float(latest_flow['Deviation CPP']):,.0f} ton"
-                        f"<br>Δ Port: {float(latest_flow['Delta Port Stock']):,.0f} ton"
-                        f" · Dev Port: {float(latest_flow['Deviation Port']):,.0f} ton"
-                    ),
-                    showarrow=False,
-                    font=dict(size=11, color="#CBD5E1"),
-                    align="center"
-                )
+        fig.add_annotation(
+            x=0.5, y=1.16, xref="paper", yref="paper",
+            text=(
+                f"Latest period: {latest_period_label}"
+                f"<br>Δ CPP: {float(latest_flow['Delta CPP Stock']):,.0f} ton"
+                f" · Dev CPP: {float(latest_flow['Deviation CPP']):,.0f} ton"
+                f"<br>Δ Port: {float(latest_flow['Delta Port Stock']):,.0f} ton"
+                f" · Dev Port: {float(latest_flow['Deviation Port']):,.0f} ton"
+            ),
+            showarrow=False,
+            font=dict(size=11, color="#CBD5E1"),
+            align="center"
+        )
 
-            fig.update_layout(
-                **theme,
-                height=360,
-                showlegend=False,
-                title=dict(text="Latest Reconciliation Snapshot", font=dict(size=16, color="#F1F5F9")),
-                xaxis=dict(**axis_style, title="Flow"),
-                yaxis=dict(**axis_style, title="Ton", zeroline=False),
-                margin=dict(l=60, r=40, t=95, b=55)
-            )
-            return fig
+    layout_cfg = dict(theme)
+    layout_cfg.update({
+        "height": 360,
+        "showlegend": False,
+        "title": dict(
+            text="Latest Reconciliation Snapshot",
+            font=dict(size=16, color="#F1F5F9")
+        ),
+        "xaxis": dict(**axis_style, title="Flow"),
+        "yaxis": dict(**axis_style, title="Ton", zeroline=False),
+        "margin": dict(l=60, r=40, t=95, b=55),
+    })
+
+    fig.update_layout(**layout_cfg)
+    return fig
 
         def make_fig_ratio_trend(theme):
             fig = go.Figure()
@@ -3338,7 +3345,8 @@ def main():
 
             fig.add_hline(y=100, line_dash="dash", line_color="#F59E0B", line_width=1.2)
 
-            fig.update_layout(
+            layout_cfg = dict(theme)
+            layout_cfg.update({
                 **theme,
                 height=360,
                 title=dict(text="Flow Ratio Trend (Last 12 Periods)", font=dict(size=16, color="#F1F5F9")),

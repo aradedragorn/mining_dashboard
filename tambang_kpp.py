@@ -1458,7 +1458,7 @@ def main():
                 <div class="pipeline-title">Production Flow Summary — Weekly Average</div>
                 <div class="pipe-chain">
                     <div class="pipe-node node-cm">
-                        <div class="pipe-node-label">To CPP33</div>
+                        <div class="pipe-node-label">From PIT To CPP</div>
                         <div class="pipe-node-title">Coal Mining</div>
                         <div class="pipe-node-value">{format_large(avg_cm)}</div>
                     </div>
@@ -1473,7 +1473,7 @@ def main():
                         </div>
                     </div>
                     <div class="pipe-node node-ch">
-                        <div class="pipe-node-label">To Port</div>
+                        <div class="pipe-node-label">From CPP To Port</div>
                         <div class="pipe-node-title">Coal Hauling</div>
                         <div class="pipe-node-value">{format_large(avg_ch)}</div>
                     </div>
@@ -1488,7 +1488,7 @@ def main():
                         </div>
                     </div>
                     <div class="pipe-node node-sales">
-                        <div class="pipe-node-label">Shipment</div>
+                        <div class="pipe-node-label">From Port To Customer</div>
                         <div class="pipe-node-title">Sales</div>
                         <div class="pipe-node-value">{format_large(avg_sales)}</div>
                     </div>

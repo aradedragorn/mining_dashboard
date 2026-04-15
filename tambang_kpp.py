@@ -1101,7 +1101,7 @@ def main():
         return
 
     source_badge_color = "#3b82f6" if selected_source_type == "upload" else "#22c55e"
-    source_badge_label = "UPLOADED FILE" if selected_source_type == "upload" else "DEMO DATA"
+    source_badge_label = "Uploaded File" if selected_source_type == "upload" else "Data Training"
 
     st.markdown(f"""
     <div style='margin-bottom:1rem;padding:0.8rem 1rem;background:rgba(255,255,255,0.05);

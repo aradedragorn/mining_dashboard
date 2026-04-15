@@ -1279,18 +1279,18 @@ def main():
         total_all_es = int(matrix['Total'].sum())
         perf_es = total_normal_es / total_all_es * 100 if total_all_es > 0 else 0
 
-        ob_avg_es = matrix.iloc[0]['Avg'] if len(matrix) > 0 else 0
-        ch_avg_es = matrix.iloc[1]['Avg'] if len(matrix) > 1 else 0
-        cm_avg_es = matrix.iloc[2]['Avg'] if len(matrix) > 2 else 0
+        ob_disp_es = matrix.iloc[0]['Avg'] if len(matrix) > 0 else 0
+        ch_disp_es = matrix.iloc[1]['Avg'] if len(matrix) > 1 else 0
+        cm_disp_es = matrix.iloc[2]['Avg'] if len(matrix) > 2 else 0
 
-        worst_stage_es = "Coal Hauling (CH)" if ch_avg_es >= cm_avg_es and ch_avg_es >= ob_avg_es else \
-                         "Coal Mining (CM)" if cm_avg_es >= ch_avg_es and cm_avg_es >= ob_avg_es else \
+        worst_stage_es = "Coal Hauling (CH)" if ch_disp_es >= cm_disp_es and ch_disp_es >= ob_disp_es else \
+                         "Coal Mining (CM)" if cm_disp_es >= ch_disp_es and cm_disp_es >= ob_disp_es else \
                          "Overburden (OB)"
-        worst_val_es = max(ch_avg_es, cm_avg_es, ob_avg_es)
-        best_stage_es = "Coal Hauling (CH)" if ch_avg_es <= cm_avg_es and ch_avg_es <= ob_avg_es else \
-                        "Coal Mining (CM)" if cm_avg_es <= ch_avg_es and cm_avg_es <= ob_avg_es else \
+        worst_val_es = max(ch_disp_es, cm_disp_es, ob_disp_es)
+        best_stage_es = "Coal Hauling (CH)" if ch_disp_es <= cm_disp_es and ch_disp_es <= ob_disp_es else \
+                        "Coal Mining (CM)" if cm_disp_es <= ch_disp_es and cm_disp_es <= ob_disp_es else \
                         "Overburden (OB)"
-        best_val_es = min(ch_avg_es, cm_avg_es, ob_avg_es)
+        best_val_es = min(ch_disp_es, cm_disp_es, ob_disp_es)
 
         severity_color_es = "#ef4444" if worst_val_es > 3 else "#f59e0b" if worst_val_es > 2 else "#22c55e"
         severity_text_es = "KRITIS" if worst_val_es > 3 else "PERHATIAN" if worst_val_es > 2 else "NORMAL"
@@ -1665,7 +1665,7 @@ def main():
                 flow['Eff Plot'] = flow['CH Flow Ratio (%)'].replace(0, None)
 
 
-                avg_eff_val = flow['CH Flow Ratio (%)'].mean()
+                disp_eff_val = flow['CH Flow Ratio (%)'].mean()
                 peak_cm = flow['CM TWB'].max()
                 below_target = (flow['CH Flow Ratio (%)'] < 100).sum()
                 total_p = len(flow)
@@ -1677,7 +1677,7 @@ def main():
                     <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                     border:1px solid rgba(148,163,184,0.1);text-align:center">
                         <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Avg Volume</div>
-                        <div style="color:#3b82f6;font-size:1.1rem;font-weight:700">{avg_cm:,.0f} t</div>
+                        <div style="color:#3b82f6;font-size:1.1rem;font-weight:700">{disp_cm:,.0f} t</div>
                     </div>""", unsafe_allow_html=True)
                 with vc2:
                     st.markdown(f"""
@@ -1687,12 +1687,12 @@ def main():
                         <div style="color:#22c55e;font-size:1.1rem;font-weight:700">{peak_cm:,.0f} t</div>
                     </div>""", unsafe_allow_html=True)
                 with vc3:
-                    eff_color = '#22c55e' if avg_eff_val >= 100 else '#f59e0b' if avg_eff_val >= 90 else '#ef4444'
+                    eff_color = '#22c55e' if disp_eff_val >= 100 else '#f59e0b' if disp_eff_val >= 90 else '#ef4444'
                     st.markdown(f"""
                     <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                     border:1px solid rgba(148,163,184,0.1);text-align:center">
                         <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Avg Efficiency</div>
-                        <div style="color:{eff_color};font-size:1.1rem;font-weight:700">{avg_eff_val:.1f}%</div>
+                        <div style="color:{eff_color};font-size:1.1rem;font-weight:700">{disp_eff_val:.1f}%</div>
                     </div>""", unsafe_allow_html=True)
                 with vc4:
                     bt_pct = below_target / total_p * 100 if total_p > 0 else 0
@@ -1767,9 +1767,9 @@ def main():
 
 
                 fig_combined.add_hline(
-                    y=avg_cm, line_dash='dot',
+                    y=disp_cm, line_dash='dot',
                     line_color='rgba(59,130,246,0.4)', line_width=1,
-                    annotation_text=f'Avg CM {avg_cm:,.0f}',
+                    annotation_text=f'Avg CM {disp_cm:,.0f}',
                     annotation_position='top left',
                     annotation_font=dict(size=9, color='#60A5FA'))
 
@@ -1782,10 +1782,10 @@ def main():
                     annotation_font=dict(size=9, color='#F59E0B'))
 
                 fig_combined.add_hline(
-                    y=avg_eff_val, line_dash='dot',
+                    y=disp_eff_val, line_dash='dot',
                     line_color='rgba(245,158,11,0.25)', line_width=1,
                     secondary_y=True,
-                    annotation_text=f'Avg Eff {avg_eff_val:.1f}%',
+                    annotation_text=f'Avg Eff {disp_eff_val:.1f}%',
                     annotation_position='bottom right',
                     annotation_font=dict(size=8, color='#FBBF24'))
 
@@ -1892,21 +1892,21 @@ def main():
             flow["Net Deviation"] = flow["Deviation CPP"] + flow["Deviation Port"]
             flow["Cum Net Deviation"] = flow["Net Deviation"].cumsum()
 
-            avg_net = flow["Net Deviation"].mean()
+            disp_net = flow["Net Deviation"].mean()
             std_loss = flow["Net Deviation"].std() if len(flow) > 1 else 0
             max_loss_val = flow["Net Deviation"].min()
             cum_total = flow["Cum Net Deviation"].iloc[-1]
-            critical_count = (flow["Net Deviation"].abs() > avg_cm * 0.02).sum()
+            critical_count = (flow["Net Deviation"].abs() > disp_cm * 0.02).sum()
             total_periods = len(flow)
 
             lc1, lc2, lc3, lc4 = st.columns(4)
             with lc1:
-                net_color = '#22c55e' if abs(avg_net) <= avg_cm * 0.01 else '#f59e0b' if abs(avg_net) <= avg_cm * 0.02 else '#ef4444'
+                net_color = '#22c55e' if abs(disp_net) <= disp_cm * 0.01 else '#f59e0b' if abs(disp_net) <= disp_cm * 0.02 else '#ef4444'
                 st.markdown(f"""
                 <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                 border:1px solid rgba(148,163,184,0.1);text-align:center">
                     <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Avg Net Deviation</div>
-                    <div style="color:{net_color};font-size:1.1rem;font-weight:700">{avg_net:,.0f} t</div>
+                    <div style="color:{net_color};font-size:1.1rem;font-weight:700">{disp_net:,.0f} t</div>
                 </div>""", unsafe_allow_html=True)
             with lc2:
                 st.markdown(f"""
@@ -1916,7 +1916,7 @@ def main():
                     <div style="color:#ef4444;font-size:1.1rem;font-weight:700">{max_loss_val:,.0f} t</div>
                 </div>""", unsafe_allow_html=True)
             with lc3:
-                cum_color = '#22c55e' if abs(cum_total) <= avg_cm * 0.01 else '#f59e0b' if abs(cum_total) <= avg_cm * 0.02 else '#ef4444'
+                cum_color = '#22c55e' if abs(cum_total) <= disp_cm * 0.01 else '#f59e0b' if abs(cum_total) <= disp_cm * 0.02 else '#ef4444'
                 st.markdown(f"""
                 <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                 border:1px solid rgba(148,163,184,0.1);text-align:center">
@@ -1960,9 +1960,9 @@ def main():
             net_colors = []
             for v in flow["Net Deviation"].values:
                 abs_v = abs(v)
-                if abs_v <= abs(avg_net) + 1 * std_loss:
+                if abs_v <= abs(disp_net) + 1 * std_loss:
                     net_colors.append('#22C55E')
-                elif abs_v <= abs(avg_net) + 2 * std_loss:
+                elif abs_v <= abs(disp_net) + 2 * std_loss:
                     net_colors.append('#F59E0B')
                 else:
                     net_colors.append('#EF4444')
@@ -2094,15 +2094,15 @@ def main():
         total_tc = df_ob_filtered['TC'].sum()
         total_js = df_ob_filtered['JS'].sum()
         total_dev_val = df_ob_filtered['Dev_Absolut'].sum()
-        avg_dev_pct = df_ob_filtered['Dev_Relatif_Pct'].abs().mean()
-        dev_color = '#4ade80' if avg_dev_pct <= 2 else '#fbbf24' if avg_dev_pct <= 3 else '#f87171'
+        disp_dev_pct = df_ob_filtered['Dev_Relatif_Pct'].abs().mean()
+        dev_color = '#4ade80' if disp_dev_pct <= 2 else '#fbbf24' if disp_dev_pct <= 3 else '#f87171'
 
         kpi_data = [
             ("Periods", f"{n_periods}", "#60a5fa"),
             ("Total TC", format_large(total_tc), "#60a5fa"),
             ("Total JS", format_large(total_js), "#4ade80"),
             ("Total Deviation", format_large(total_dev_val), "#fbbf24"),
-            ("Avg |Dev%|", f"{format_number(avg_dev_pct, 2)}%", dev_color),
+            ("Avg |Dev%|", f"{format_number(disp_dev_pct, 2)}%", dev_color),
         ]
 
         cols_kpi = st.columns(5, gap="medium")
@@ -2167,11 +2167,11 @@ def main():
                 hovertemplate='<b>JS</b><br>%{y:,.0f}<extra></extra>'
             ))
 
-            avg_tc_val = df_ob_filtered['TC'].mean()
+            disp_tc_val = df_ob_filtered['TC'].mean()
             fig_comp.add_hline(
-                y=avg_tc_val, line_dash='dot',
+                y=disp_tc_val, line_dash='dot',
                 line_color='rgba(59,130,246,0.35)', line_width=1,
-                annotation_text=f'Avg TC {avg_tc_val:,.0f}',
+                annotation_text=f'Avg TC {disp_tc_val:,.0f}',
                 annotation_position='top left',
                 annotation_font=dict(size=9, color='#60A5FA')
             )
@@ -2763,14 +2763,14 @@ def main():
         total_all = int(matrix['Total'].sum())
         perf = total_normal / total_all * 100 if total_all > 0 else 0
 
-        ob_avg_dev = df_ob['Dev_Relatif_Pct'].abs().mean()
-        ch_avg_dev = df_ch['Dev_CH_Relatif_Pct'].abs().mean() if len(df_ch) > 0 else 0
-        cm_avg_dev = df_cm_data['Dev_CM_Relatif_Pct'].abs().mean() if len(df_cm_data) > 0 else 0
+        ob_disp_dev = df_ob['Dev_Relatif_Pct'].abs().mean()
+        ch_disp_dev = df_ch['Dev_CH_Relatif_Pct'].abs().mean() if len(df_ch) > 0 else 0
+        cm_disp_dev = df_cm_data['Dev_CM_Relatif_Pct'].abs().mean() if len(df_cm_data) > 0 else 0
 
-        avg_eff = flow['Overall Efficiency (%)'].mean() if (flow is not None and len(flow) > 0) else 0
-        avg_cm = flow['CM TWB'].mean() if (flow is not None and len(flow) > 0) else 0
-        avg_ch = flow['CH TWB'].mean() if (flow is not None and len(flow) > 0) else 0
-        avg_sales = flow['Sales'].mean() if (flow is not None and len(flow) > 0) else 0
+        disp_eff = flow['Overall Efficiency (%)'].mean() if (flow is not None and len(flow) > 0) else 0
+        disp_cm = flow['CM TWB'].mean() if (flow is not None and len(flow) > 0) else 0
+        disp_ch = flow['CH TWB'].mean() if (flow is not None and len(flow) > 0) else 0
+        disp_sales = flow['Sales'].mean() if (flow is not None and len(flow) > 0) else 0
         cm_loss = flow['CM Loss'].mean() if (flow is not None and len(flow) > 0) else 0
         ch_loss = flow['CH Loss'].mean() if (flow is not None and len(flow) > 0) else 0
         ch_eff = flow['CH Efficiency (%)'].mean() if (flow is not None and len(flow) > 0) else 0
@@ -2799,9 +2799,9 @@ def main():
         perf_c = '#4ade80' if perf >= 70 else '#fbbf24' if perf >= 50 else '#f87171'
         perf_lbl = "Good" if perf >= 70 else "Fair" if perf >= 50 else "Poor"
 
-        ob_clr, ob_lbl2 = sbadge(ob_avg_dev)
-        ch_clr, ch_lbl2 = sbadge(ch_avg_dev)
-        cm_clr, cm_lbl2 = sbadge(cm_avg_dev)
+        ob_clr, ob_lbl2 = sbadge(ob_disp_dev)
+        ch_clr, ch_lbl2 = sbadge(ch_disp_dev)
+        cm_clr, cm_lbl2 = sbadge(cm_disp_dev)
 
         # ════════════════════════════════════════════════════
         # 2) PERFORMANCE MATRIX TABLE
@@ -2831,8 +2831,8 @@ def main():
 
             stage_names = ['Overburden (OB)', 'Coal Hauling (CH/Port)', 'Coal Mining (CM/CPP33)']
             for idx, row in matrix.iterrows():
-                avg_d = row['Avg']
-                dc = '#4ade80' if avg_d <= 2 else '#fbbf24' if avg_d <= 3 else '#f87171'
+                disp_d = row['Avg']
+                dc = '#4ade80' if disp_d <= 2 else '#fbbf24' if disp_d <= 3 else '#f87171'
                 norm = int(row['Normal'])
                 caut = int(row['Caution'])
                 crit = int(row['Critical'])
@@ -2843,7 +2843,7 @@ def main():
                 perf_html += f"""
                 <tr style="border-bottom:1px solid rgba(148,163,184,0.06);">
                     <td style="padding:11px 16px;color:#e2e8f0;font-weight:600;">{name}</td>
-                    <td style="padding:11px 14px;text-align:center;color:{dc};font-weight:700;">{avg_d:.2f}%</td>
+                    <td style="padding:11px 14px;text-align:center;color:{dc};font-weight:700;">{disp_d:.2f}%</td>
                     <td style="padding:11px 14px;text-align:center;color:#4ade80;font-weight:700;">{norm}</td>
                     <td style="padding:11px 14px;text-align:center;color:#fbbf24;font-weight:700;">{caut}</td>
                     <td style="padding:11px 14px;text-align:center;color:#f87171;font-weight:700;">{crit}</td>
@@ -3021,9 +3021,9 @@ def main():
                 ann = '' if yv == 0 else (f'{"Caution" if abs(yv)==2 else "Critical"} ±{abs(yv)}%' if yv > 0 else '')
                 fig.add_hline(y=yv, line_color=clr, line_dash=dsh, line_width=1, annotation_text=ann,
                     annotation_position='right', annotation_font_size=9, annotation_font_color=clr)
-            avg_line = df_ob['Dev_Relatif_Pct'].abs().mean()
-            fig.add_hline(y=avg_line, line_color='#A78BFA', line_dash='dot', line_width=1,
-                annotation_text=f'Avg: {avg_line:.2f}%', annotation_position='top right',
+            disp_line = df_ob['Dev_Relatif_Pct'].abs().mean()
+            fig.add_hline(y=disp_line, line_color='#A78BFA', line_dash='dot', line_width=1,
+                annotation_text=f'Avg: {disp_line:.2f}%', annotation_position='top right',
                 annotation_font_size=9, annotation_font_color='#A78BFA')
             fig.update_layout(**theme, height=350, showlegend=False,
                 title=dict(text='OB Deviation Trend (%)', font=dict(size=14, color='#F1F5F9')),
@@ -3096,11 +3096,11 @@ def main():
                 fig.add_trace(go.Scatter(x=flow['Date'], y=flow['Sales'], mode='lines+markers', name='Sales',
                     line=dict(color='#A78BFA', width=2.5), marker=dict(size=6, color='#A78BFA'),
                     hovertemplate='Sales: %{y:,.0f}<extra></extra>'))
-                fig.add_hline(y=avg_cm, line_color='#60A5FA', line_dash='dot', line_width=1,
-                    annotation_text=f'Avg CM {avg_cm:,.0f}', annotation_position='top left',
+                fig.add_hline(y=disp_cm, line_color='#60A5FA', line_dash='dot', line_width=1,
+                    annotation_text=f'Avg CM {disp_cm:,.0f}', annotation_position='top left',
                     annotation_font=dict(size=9, color='#60A5FA'))
-                fig.add_hline(y=avg_sales, line_color='#A78BFA', line_dash='dot', line_width=1,
-                    annotation_text=f'Avg Sales {avg_sales:,.0f}', annotation_position='bottom right',
+                fig.add_hline(y=disp_sales, line_color='#A78BFA', line_dash='dot', line_width=1,
+                    annotation_text=f'Avg Sales {disp_sales:,.0f}', annotation_position='bottom right',
                     annotation_font=dict(size=9, color='#A78BFA'))
             fig.update_layout(**theme, height=380,
                 title=dict(text='Material Throughput (ton)', font=dict(size=15, color='#F1F5F9', family='Inter, Arial, sans-serif')),
@@ -3127,9 +3127,9 @@ def main():
                 fig.add_hline(y=100, line_color='#F59E0B', line_dash='dash', line_width=1.5,
                     annotation_text='Target 100%', annotation_position='top right',
                     annotation_font=dict(size=10, color='#F59E0B'))
-                avg_eff_val = flow['Overall Efficiency (%)'].mean()
-                fig.add_hline(y=avg_eff_val, line_color='#34D399', line_dash='dot', line_width=1,
-                    annotation_text=f'Avg {avg_eff_val:.1f}%', annotation_position='bottom left',
+                disp_eff_val = flow['Overall Efficiency (%)'].mean()
+                fig.add_hline(y=disp_eff_val, line_color='#34D399', line_dash='dot', line_width=1,
+                    annotation_text=f'Avg {disp_eff_val:.1f}%', annotation_position='bottom left',
                     annotation_font=dict(size=9, color='#34D399'))
                 eff_min = min(50, flow['Overall Efficiency (%)'].min() - 5)
                 eff_max = max(110, flow['Overall Efficiency (%)'].max() + 5)
@@ -3262,13 +3262,13 @@ def main():
                 ed.append(['Overall Perf', 'Total Periods', 'Critical Alerts', 'Avg Efficiency', 'OB Avg Dev', 'CH Avg Dev', 'CM Avg Dev'])
                 ed.append([
                     round(perf, 1), total_normal + total_caution + total_critical,
-                    total_critical, round(avg_eff, 1),
-                    round(ob_avg_dev, 2), round(ch_avg_dev, 2), round(cm_avg_dev, 2)
+                    total_critical, round(disp_eff, 1),
+                    round(ob_disp_dev, 2), round(ch_disp_dev, 2), round(cm_disp_dev, 2)
                 ])
                 ed.append(['', '', '', '', '', '', ''])
                 ed.append(['OVERBURDEN (OB)', 'Value', 'Status', '', 'COAL HAULING (CH)', 'Value', 'Status'])
                 ed.append(['Total Periods', len(df_ob), '', '', 'Total Periods', len(df_ch), ''])
-                ed.append(['Avg Dev (%)', round(ob_avg_dev, 2), 'Normal' if ob_avg_dev <= 2 else 'Caution' if ob_avg_dev <= 3 else 'Critical', '', 'Avg Dev (%)', round(ch_avg_dev, 2), 'Normal' if ch_avg_dev <= 2 else 'Caution' if ch_avg_dev <= 3 else 'Critical'])
+                ed.append(['Avg Dev (%)', round(ob_disp_dev, 2), 'Normal' if ob_disp_dev <= 2 else 'Caution' if ob_disp_dev <= 3 else 'Critical', '', 'Avg Dev (%)', round(ch_disp_dev, 2), 'Normal' if ch_disp_dev <= 2 else 'Caution' if ch_disp_dev <= 3 else 'Critical'])
                 ed.append(['Max Dev (%)', round(df_ob["Dev_Relatif_Pct"].max(), 2), '', '', 'Max Dev (%)', round(df_ch["Dev_CH_Relatif_Pct"].max(), 2) if len(df_ch) > 0 else '-', ''])
                 ed.append(['Std Dev', round(df_ob["Dev_Relatif_Pct"].std(), 2), '', '', 'Std Dev', round(df_ch["Dev_CH_Relatif_Pct"].std(), 2) if len(df_ch) > 0 else '-', ''])
                 ed.append(['Normal', int(matrix.iloc[0]['Normal']), '', '', 'Normal', int(matrix.iloc[1]['Normal']), ''])
@@ -3279,10 +3279,10 @@ def main():
                 ed.append(['', '', '', '', '', '', ''])
                 ed.append(['COAL MINING (CM)', 'Value', 'Status', '', 'OVERALL SUMMARY', 'Value', ''])
                 ed.append(['Total Periods', len(df_cm_data), '', '', 'Total Normal', total_normal, ''])
-                ed.append(['Avg Dev (%)', round(cm_avg_dev, 2), 'Normal' if cm_avg_dev <= 2 else 'Caution' if cm_avg_dev <= 3 else 'Critical', '', 'Total Caution', total_caution, ''])
+                ed.append(['Avg Dev (%)', round(cm_disp_dev, 2), 'Normal' if cm_disp_dev <= 2 else 'Caution' if cm_disp_dev <= 3 else 'Critical', '', 'Total Caution', total_caution, ''])
                 ed.append(['Max Dev (%)', round(df_cm_data["Dev_CM_Relatif_Pct"].max(), 2) if len(df_cm_data) > 0 else '-', '', '', 'Total Critical', total_critical, ''])
                 ed.append(['Std Dev', round(df_cm_data["Dev_CM_Relatif_Pct"].std(), 2) if len(df_cm_data) > 0 else '-', '', '', 'Performance', round(perf, 1), ''])
-                ed.append(['Normal', int(matrix.iloc[2]['Normal']), '', '', 'Avg Efficiency', round(avg_eff, 1), ''])
+                ed.append(['Normal', int(matrix.iloc[2]['Normal']), '', '', 'Avg Efficiency', round(disp_eff, 1), ''])
                 ed.append(['Caution', int(matrix.iloc[2]['Caution']), '', '', '', '', ''])
                 ed.append(['Critical', int(matrix.iloc[2]['Critical']), '', '', '', '', ''])
                 ed.append(['Avg TWB', round(df_cm_data["TWB_CM"].mean()) if len(df_cm_data) > 0 else '-', '', '', '', '', ''])
@@ -3374,7 +3374,7 @@ def main():
                 df_ob_exp.to_excel(writer, sheet_name='OB Analysis', index=False, startrow=2)
                 ws_ob = writer.sheets['OB Analysis']
                 ws_ob.merge_cells('A2:F2')
-                ws_ob['A2'] = f'Periods: {len(df_ob)} | Avg Dev: {ob_avg_dev:.2f}% | Normal: {int(matrix.iloc[0]["Normal"])} | Caution: {int(matrix.iloc[0]["Caution"])} | Critical: {int(matrix.iloc[0]["Critical"])}'
+                ws_ob['A2'] = f'Periods: {len(df_ob)} | Avg Dev: {ob_disp_dev:.2f}% | Normal: {int(matrix.iloc[0]["Normal"])} | Caution: {int(matrix.iloc[0]["Caution"])} | Critical: {int(matrix.iloc[0]["Critical"])}'
                 ws_ob['A2'].font = Font(size=8, italic=True, color=C['kpp_dk'])
                 ws_ob['A2'].fill = PatternFill(start_color=C['kpp_lt'], end_color=C['kpp_lt'], fill_type='solid')
                 ws_ob['A2'].alignment = al_c
@@ -3615,10 +3615,10 @@ def main():
                          make_fig7(chart_theme_st), make_fig8(chart_theme_st)]
             f_divs = [f.to_html(full_html=False, include_plotlyjs=False) for f in figs_html]
 
-            ch_avg_twb = df_ch['TWB_CH'].mean() if len(df_ch) > 0 else 0
-            cm_avg_twb = df_cm_data['TWB_CM'].mean() if len(df_cm_data) > 0 else 0
-            ch_avg_wb = df_ch['CH_WB'].mean() if len(df_ch) > 0 else 0
-            cm_avg_wb = df_cm_data['CM_WB'].mean() if len(df_cm_data) > 0 else 0
+            ch_disp_twb = df_ch['TWB_CH'].mean() if len(df_ch) > 0 else 0
+            cm_disp_twb = df_cm_data['TWB_CM'].mean() if len(df_cm_data) > 0 else 0
+            ch_disp_wb = df_ch['CH_WB'].mean() if len(df_ch) > 0 else 0
+            cm_disp_wb = df_cm_data['CM_WB'].mean() if len(df_cm_data) > 0 else 0
             ob_max_dev = df_ob['Dev_Relatif_Pct'].abs().max()
             ob_tc_total = df_ob['TC'].sum()
             ob_js_total = df_ob['JS'].sum()
@@ -3627,7 +3627,7 @@ def main():
             ob_critical_n = int(matrix.iloc[0]['Critical'])
 
             stats_a = [
-                ('Avg Deviation', f'{ob_avg_dev:.2f}%', '#F59E0B' if ob_avg_dev > 2 else '#22C55E'),
+                ('Avg Deviation', f'{ob_disp_dev:.2f}%', '#F59E0B' if ob_disp_dev > 2 else '#22C55E'),
                 ('Max Deviation', f'{ob_max_dev:.2f}%', '#EF4444' if ob_max_dev > 3 else '#F59E0B'),
                 ('Total TC', f'{ob_tc_total:,.0f} BCM', '#60A5FA'),
                 ('Total JS', f'{ob_js_total:,.0f} BCM', '#34D399'),
@@ -3636,12 +3636,12 @@ def main():
                 ('Critical', str(ob_critical_n), '#EF4444'),
             ]
             stats_b = [
-                ('CH Avg TWB', f'{ch_avg_twb:,.0f} ton', '#60A5FA'),
-                ('CH Avg WB', f'{ch_avg_wb:,.0f} ton', '#34D399'),
-                ('CH Avg Dev', f'{ch_avg_dev:.2f}%', '#F59E0B' if ch_avg_dev > 2 else '#22C55E'),
-                ('CM Avg TWB', f'{cm_avg_twb:,.0f} ton', '#60A5FA'),
-                ('CM Avg WB', f'{cm_avg_wb:,.0f} ton', '#34D399'),
-                ('CM Avg Dev', f'{cm_avg_dev:.2f}%', '#F59E0B' if cm_avg_dev > 2 else '#22C55E'),
+                ('CH Avg TWB', f'{ch_disp_twb:,.0f} ton', '#60A5FA'),
+                ('CH Avg WB', f'{ch_disp_wb:,.0f} ton', '#34D399'),
+                ('CH Avg Dev', f'{ch_disp_dev:.2f}%', '#F59E0B' if ch_disp_dev > 2 else '#22C55E'),
+                ('CM Avg TWB', f'{cm_disp_twb:,.0f} ton', '#60A5FA'),
+                ('CM Avg WB', f'{cm_disp_wb:,.0f} ton', '#34D399'),
+                ('CM Avg Dev', f'{cm_disp_dev:.2f}%', '#F59E0B' if cm_disp_dev > 2 else '#22C55E'),
             ]
             stats_c = [
                 ('CH Normal', str(int(matrix.iloc[1]['Normal'])), '#22C55E'),
@@ -3652,12 +3652,12 @@ def main():
                 ('CM Critical', str(int(matrix.iloc[2]['Critical'])), '#EF4444'),
             ]
             stats_d = [
-                ('Avg CM TWB', f'{avg_cm:,.0f} ton', '#60A5FA'),
-                ('Avg CH TWB', f'{avg_ch:,.0f} ton', '#34D399'),
-                ('Avg Sales', f'{avg_sales:,.0f} ton', '#A78BFA'),
+                ('Avg CM TWB', f'{disp_cm:,.0f} ton', '#60A5FA'),
+                ('Avg CH TWB', f'{disp_ch:,.0f} ton', '#34D399'),
+                ('Avg Sales', f'{disp_sales:,.0f} ton', '#A78BFA'),
                 ('CM Loss', f'{cm_loss:,.0f} ton', '#F59E0B'),
                 ('CH Eff', f'{ch_eff:.1f}%', '#34D399'),
-                ('Overall Eff', f'{avg_eff:.1f}%', '#34D399'),
+                ('Overall Eff', f'{disp_eff:.1f}%', '#34D399'),
             ]
             all_stats = [stats_a, stats_b, stats_c, stats_d]
 
@@ -3724,10 +3724,10 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0;min-height:1
 <div class="sec">
 <div class="sh"><h2> Executive KPI Summary</h2></div>
 <div class="kr">
-<div class="kc" style="--ac:{ob_clr}"><div class="lb">OVERBURDEN (OB)</div><div class="vl">{ob_avg_dev:.2f}%</div><div class="st" style="color:{ob_clr}">{ob_lbl2}</div><div class="dt">{int(matrix.iloc[0]['Total'])} Periods</div></div>
-<div class="kc" style="--ac:{ch_clr}"><div class="lb">COAL HAULING (CH)</div><div class="vl">{ch_avg_dev:.2f}%</div><div class="st" style="color:{ch_clr}">{ch_lbl2}</div><div class="dt">{int(matrix.iloc[1]['Total'])} Periods</div></div>
-<div class="kc" style="--ac:{cm_clr}"><div class="lb">COAL MINING (CM)</div><div class="vl">{cm_avg_dev:.2f}%</div><div class="st" style="color:{cm_clr}">{cm_lbl2}</div><div class="dt">{int(matrix.iloc[2]['Total'])} Periods</div></div>
-<div class="kc" style="--ac:{'#22C55E' if perf >= 70 else '#F59E0B' if perf >= 50 else '#EF4444'}"><div class="lb">OVERALL PERFORMANCE</div><div class="vl">{perf:.1f}%</div><div class="st" style="color:{'#22C55E' if perf >= 70 else '#F59E0B' if perf >= 50 else '#EF4444'}">{'Good' if perf >= 70 else 'Fair' if perf >= 50 else 'Poor'}</div><div class="dt">Avg Eff: {avg_eff:.1f}%</div></div>
+<div class="kc" style="--ac:{ob_clr}"><div class="lb">OVERBURDEN (OB)</div><div class="vl">{ob_disp_dev:.2f}%</div><div class="st" style="color:{ob_clr}">{ob_lbl2}</div><div class="dt">{int(matrix.iloc[0]['Total'])} Periods</div></div>
+<div class="kc" style="--ac:{ch_clr}"><div class="lb">COAL HAULING (CH)</div><div class="vl">{ch_disp_dev:.2f}%</div><div class="st" style="color:{ch_clr}">{ch_lbl2}</div><div class="dt">{int(matrix.iloc[1]['Total'])} Periods</div></div>
+<div class="kc" style="--ac:{cm_clr}"><div class="lb">COAL MINING (CM)</div><div class="vl">{cm_disp_dev:.2f}%</div><div class="st" style="color:{cm_clr}">{cm_lbl2}</div><div class="dt">{int(matrix.iloc[2]['Total'])} Periods</div></div>
+<div class="kc" style="--ac:{'#22C55E' if perf >= 70 else '#F59E0B' if perf >= 50 else '#EF4444'}"><div class="lb">OVERALL PERFORMANCE</div><div class="vl">{perf:.1f}%</div><div class="st" style="color:{'#22C55E' if perf >= 70 else '#F59E0B' if perf >= 50 else '#EF4444'}">{'Good' if perf >= 70 else 'Fair' if perf >= 50 else 'Poor'}</div><div class="dt">Avg Eff: {disp_eff:.1f}%</div></div>
 </div>
 </div>
 
@@ -3780,9 +3780,9 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0;min-height:1
 <table class="mt">
 <thead><tr><th>Stage</th><th>Avg |Dev%|</th><th>Normal</th><th>Caution</th><th>Critical</th><th>Total</th><th>Performance</th></tr></thead>
 <tbody>
-<tr><td><strong>Overburden (OB)</strong></td><td>{ob_avg_dev:.2f}%</td><td class="cg2">{int(matrix.iloc[0]['Normal'])}</td><td class="cy">{int(matrix.iloc[0]['Caution'])}</td><td class="cr">{int(matrix.iloc[0]['Critical'])}</td><td>{int(matrix.iloc[0]['Total'])}</td><td>{int(matrix.iloc[0]['Normal'])/max(int(matrix.iloc[0]['Total']),1)*100:.0f}%</td></tr>
-<tr><td><strong>Coal Hauling (CH)</strong></td><td>{ch_avg_dev:.2f}%</td><td class="cg2">{int(matrix.iloc[1]['Normal'])}</td><td class="cy">{int(matrix.iloc[1]['Caution'])}</td><td class="cr">{int(matrix.iloc[1]['Critical'])}</td><td>{int(matrix.iloc[1]['Total'])}</td><td>{int(matrix.iloc[1]['Normal'])/max(int(matrix.iloc[1]['Total']),1)*100:.0f}%</td></tr>
-<tr><td><strong>Coal Mining (CM)</strong></td><td>{cm_avg_dev:.2f}%</td><td class="cg2">{int(matrix.iloc[2]['Normal'])}</td><td class="cy">{int(matrix.iloc[2]['Caution'])}</td><td class="cr">{int(matrix.iloc[2]['Critical'])}</td><td>{int(matrix.iloc[2]['Total'])}</td><td>{int(matrix.iloc[2]['Normal'])/max(int(matrix.iloc[2]['Total']),1)*100:.0f}%</td></tr>
+<tr><td><strong>Overburden (OB)</strong></td><td>{ob_disp_dev:.2f}%</td><td class="cg2">{int(matrix.iloc[0]['Normal'])}</td><td class="cy">{int(matrix.iloc[0]['Caution'])}</td><td class="cr">{int(matrix.iloc[0]['Critical'])}</td><td>{int(matrix.iloc[0]['Total'])}</td><td>{int(matrix.iloc[0]['Normal'])/max(int(matrix.iloc[0]['Total']),1)*100:.0f}%</td></tr>
+<tr><td><strong>Coal Hauling (CH)</strong></td><td>{ch_disp_dev:.2f}%</td><td class="cg2">{int(matrix.iloc[1]['Normal'])}</td><td class="cy">{int(matrix.iloc[1]['Caution'])}</td><td class="cr">{int(matrix.iloc[1]['Critical'])}</td><td>{int(matrix.iloc[1]['Total'])}</td><td>{int(matrix.iloc[1]['Normal'])/max(int(matrix.iloc[1]['Total']),1)*100:.0f}%</td></tr>
+<tr><td><strong>Coal Mining (CM)</strong></td><td>{cm_disp_dev:.2f}%</td><td class="cg2">{int(matrix.iloc[2]['Normal'])}</td><td class="cy">{int(matrix.iloc[2]['Caution'])}</td><td class="cr">{int(matrix.iloc[2]['Critical'])}</td><td>{int(matrix.iloc[2]['Total'])}</td><td>{int(matrix.iloc[2]['Normal'])/max(int(matrix.iloc[2]['Total']),1)*100:.0f}%</td></tr>
 <tr class="rt"><td><strong>OVERALL</strong></td><td></td><td class="cg2"><strong>{total_normal}</strong></td><td class="cy"><strong>{total_caution}</strong></td><td class="cr"><strong>{total_critical}</strong></td><td><strong>{total_all}</strong></td><td><strong>{perf:.1f}%</strong></td></tr>
 </tbody></table>
 </div>
@@ -3986,13 +3986,13 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0;min-height:1
                             y = sec_hdr(y, "EXECUTIVE KPI SUMMARY")
                             kpi = [
                                 ("OVERBURDEN (OB)",
-                                 f"{ob_avg_dev:.2f}%", ob_lbl2, ob_clr,
+                                 f"{ob_disp_dev:.2f}%", ob_lbl2, ob_clr,
                                  f"{int(matrix.iloc[0]['Total'])} Periods"),
                                 ("COAL HAULING (CH)",
-                                 f"{ch_avg_dev:.2f}%", ch_lbl2, ch_clr,
+                                 f"{ch_disp_dev:.2f}%", ch_lbl2, ch_clr,
                                  f"{int(matrix.iloc[1]['Total'])} Periods"),
                                 ("COAL MINING (CM)",
-                                 f"{cm_avg_dev:.2f}%", cm_lbl2, cm_clr,
+                                 f"{cm_disp_dev:.2f}%", cm_lbl2, cm_clr,
                                  f"{int(matrix.iloc[2]['Total'])} Periods"),
                                 ("OVERALL PERFORMANCE",
                                  f"{perf:.1f}%",
@@ -4001,7 +4001,7 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0;min-height:1
                                  '#22C55E' if perf >= 70
                                  else '#F59E0B' if perf >= 50
                                  else '#EF4444',
-                                 f"Avg Eff: {avg_eff:.1f}%"),
+                                 f"Avg Eff: {disp_eff:.1f}%"),
                             ]
                             kw = (W - 2*PAD - 3*CGAP) // 4
                             for i, (lb, vl, st_txt, cl, dt) in enumerate(
@@ -4159,21 +4159,21 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0;min-height:1
 
                             rows = [
                                 ('Overburden (OB)',
-                                 f'{ob_avg_dev:.2f}%',
+                                 f'{ob_disp_dev:.2f}%',
                                  str(int(matrix.iloc[0]['Normal'])),
                                  str(int(matrix.iloc[0]['Caution'])),
                                  str(int(matrix.iloc[0]['Critical'])),
                                  str(int(matrix.iloc[0]['Total'])),
                                  f'{int(matrix.iloc[0]["Normal"])/max(int(matrix.iloc[0]["Total"]),1)*100:.0f}%'),
                                 ('Coal Hauling (CH)',
-                                 f'{ch_avg_dev:.2f}%',
+                                 f'{ch_disp_dev:.2f}%',
                                  str(int(matrix.iloc[1]['Normal'])),
                                  str(int(matrix.iloc[1]['Caution'])),
                                  str(int(matrix.iloc[1]['Critical'])),
                                  str(int(matrix.iloc[1]['Total'])),
                                  f'{int(matrix.iloc[1]["Normal"])/max(int(matrix.iloc[1]["Total"]),1)*100:.0f}%'),
                                 ('Coal Mining (CM)',
-                                 f'{cm_avg_dev:.2f}%',
+                                 f'{cm_disp_dev:.2f}%',
                                  str(int(matrix.iloc[2]['Normal'])),
                                  str(int(matrix.iloc[2]['Caution'])),
                                  str(int(matrix.iloc[2]['Critical'])),

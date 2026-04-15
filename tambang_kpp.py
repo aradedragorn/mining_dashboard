@@ -26,8 +26,15 @@ st.set_page_config(
 )
 
 # Path logo - sesuaikan dengan path logo Anda
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
+BASE_DIR = Path(__file__).resolve().parent
+LOGO_PATH = BASE_DIR / "assets" / "logo.png"
+DEMO_DATA_DIR = BASE_DIR / "demo_data"
+
+DEMO_FILES = {
+    "Training Data Beneran": DEMO_DATA_DIR / "Training Data Beneran.xlsx",
+    # Tambahkan file demo lain jika ada
+    # "Demo Januari": DEMO_DATA_DIR / "Demo Januari.xlsx",
+}
 
 # Fungsi untuk mengonversi gambar ke base64 dengan resize
 def get_base64_image(image_path, size=(120, 120)):  # Diperbesar dari 60 ke 120

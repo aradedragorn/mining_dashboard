@@ -774,7 +774,7 @@ def get_active_data_source():
                 selected_file = available_demo_files[demo_choice]
                 selected_file_name = available_demo_files[demo_choice].name
                 selected_source_type = "demo"
-                st.success(f"Data Training: {selected_file_name}")
+                st.success(f"File Aktif: {selected_file_name}")
 
         else:
             uploaded = st.file_uploader(

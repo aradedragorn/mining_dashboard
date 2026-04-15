@@ -1868,7 +1868,7 @@ def main():
                     gridcolor='rgba(0,0,0,0)',
                     tickfont=dict(size=10, color='#F59E0B'),
                     showline=False,
-                    zeroline=False
+                    zeroline=False,
                     range=[0, max(130, flow['CH Flow Ratio (%)'].max() + 15)],
                     secondary_y=True,
                 )

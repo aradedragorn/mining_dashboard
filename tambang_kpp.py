@@ -1884,219 +1884,169 @@ def main():
                 # MATERIAL LOSS ANALYSIS — Enhanced Stacked + Cumulative
                 # ══════════════════════════════════════════════════════════
                 
-                st.markdown("###  Reconciliation Deviation Analysis")
+            # ══════════════════════════════════════════════════════════
+            # RECONCILIATION DEVIATION ANALYSIS
+            # ══════════════════════════════════════════════════════════
+            st.markdown("### Reconciliation Deviation Analysis")
 
-                flow['Net Deviation'] = flow['Deviation CPP'] + flow['Deviation Port']
-                flow['Cum Net Deviation'] = flow['Net Deviation'].cumsum()
+            flow["Net Deviation"] = flow["Deviation CPP"] + flow["Deviation Port"]
+            flow["Cum Net Deviation"] = flow["Net Deviation"].cumsum()
 
-                avg_net = flow['Net Deviation'].mean()
-                std_loss = flow['Net Deviation'].std() if len(flow) > 1 else 0
-                max_loss_val = flow['Net Deviation'].min()
-                cum_total = flow['Cum Net Deviation'].iloc[-1]
-                critical_count = (flow['Net Deviation'].abs() > avg_cm * 0.02).sum()
-                total_periods = len(flow)
+            avg_net = flow["Net Deviation"].mean()
+            std_loss = flow["Net Deviation"].std() if len(flow) > 1 else 0
+            max_loss_val = flow["Net Deviation"].min()
+            cum_total = flow["Cum Net Deviation"].iloc[-1]
+            critical_count = (flow["Net Deviation"].abs() > avg_cm * 0.02).sum()
+            total_periods = len(flow)
 
+            lc1, lc2, lc3, lc4 = st.columns(4)
+            with lc1:
+                net_color = '#22c55e' if abs(avg_net) <= avg_cm * 0.01 else '#f59e0b' if abs(avg_net) <= avg_cm * 0.02 else '#ef4444'
+                st.markdown(f"""
+                <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
+                border:1px solid rgba(148,163,184,0.1);text-align:center">
+                    <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Avg Net Deviation</div>
+                    <div style="color:{net_color};font-size:1.1rem;font-weight:700">{avg_net:,.0f} t</div>
+                </div>""", unsafe_allow_html=True)
+            with lc2:
+                st.markdown(f"""
+                <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
+                border:1px solid rgba(148,163,184,0.1);text-align:center">
+                    <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Max Single Deviation</div>
+                    <div style="color:#ef4444;font-size:1.1rem;font-weight:700">{max_loss_val:,.0f} t</div>
+                </div>""", unsafe_allow_html=True)
+            with lc3:
+                cum_color = '#22c55e' if abs(cum_total) <= avg_cm * 0.01 else '#f59e0b' if abs(cum_total) <= avg_cm * 0.02 else '#ef4444'
+                st.markdown(f"""
+                <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
+                border:1px solid rgba(148,163,184,0.1);text-align:center">
+                    <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Cumulative Deviation</div>
+                    <div style="color:{cum_color};font-size:1.1rem;font-weight:700">{cum_total:,.0f} t</div>
+                </div>""", unsafe_allow_html=True)
+            with lc4:
+                crit_pct = critical_count / total_periods * 100 if total_periods > 0 else 0
+                crit_color = '#22c55e' if crit_pct < 20 else '#f59e0b' if crit_pct < 40 else '#ef4444'
+                st.markdown(f"""
+                <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
+                border:1px solid rgba(148,163,184,0.1);text-align:center">
+                    <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Critical Periods</div>
+                    <div style="color:{crit_color};font-size:1.1rem;font-weight:700">{critical_count}/{total_periods} ({crit_pct:.0f}%)</div>
+                </div>""", unsafe_allow_html=True)
 
-                lc1, lc2, lc3, lc4 = st.columns(4)
-                with lc1:
-                    net_color = '#22c55e' if avg_net >= 0 else '#ef4444'
-                    st.markdown(f"""
-                    <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
-                    border:1px solid rgba(148,163,184,0.1);text-align:center">
-                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Avg Net Loss</div>
-                        <div style="color:{net_color};font-size:1.1rem;font-weight:700">{avg_net:,.0f} t</div>
-                    </div>""", unsafe_allow_html=True)
-                with lc2:
-                    st.markdown(f"""
-                    <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
-                    border:1px solid rgba(148,163,184,0.1);text-align:center">
-                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Max Single Loss</div>
-                        <div style="color:#ef4444;font-size:1.1rem;font-weight:700">{max_loss_val:,.0f} t</div>
-                    </div>""", unsafe_allow_html=True)
-                with lc3:
-                    cum_color = '#22c55e' if cum_total >= 0 else '#ef4444'
-                    st.markdown(f"""
-                    <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
-                    border:1px solid rgba(148,163,184,0.1);text-align:center">
-                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Cumulative Loss</div>
-                        <div style="color:{cum_color};font-size:1.1rem;font-weight:700">{cum_total:,.0f} t</div>
-                    </div>""", unsafe_allow_html=True)
-                with lc4:
-                    crit_pct = critical_count / total_periods * 100 if total_periods > 0 else 0
-                    crit_color = '#22c55e' if crit_pct < 20 else '#f59e0b' if crit_pct < 40 else '#ef4444'
-                    st.markdown(f"""
-                    <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
-                    border:1px solid rgba(148,163,184,0.1);text-align:center">
-                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Critical Periods</div>
-                        <div style="color:{crit_color};font-size:1.1rem;font-weight:700">{critical_count}/{total_periods} ({crit_pct:.0f}%)</div>
-                    </div>""", unsafe_allow_html=True)
+            fig_loss = make_subplots(specs=[[{"secondary_y": True}]])
 
+            fig_loss.add_trace(go.Bar(
+                x=flow["Date"],
+                y=flow["Deviation Port"],
+                name="Port Deviation",
+                marker=dict(
+                    color='rgba(239,68,68,0.7)',
+                    line=dict(width=0.5, color='rgba(239,68,68,0.9)')
+                ),
+                hovertemplate='<b>Port Deviation</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
+            ), secondary_y=False)
 
-                from plotly.subplots import make_subplots
+            fig_loss.add_trace(go.Bar(
+                x=flow["Date"],
+                y=flow["Deviation CPP"],
+                name="CPP33 Deviation",
+                marker=dict(
+                    color='rgba(234,179,8,0.7)',
+                    line=dict(width=0.5, color='rgba(234,179,8,0.9)')
+                ),
+                hovertemplate='<b>CPP33 Deviation</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
+            ), secondary_y=False)
 
-                fig_loss = make_subplots(specs=[[{"secondary_y": True}]])
+            net_colors = []
+            for v in flow["Net Deviation"].values:
+                abs_v = abs(v)
+                if abs_v <= abs(avg_net) + 1 * std_loss:
+                    net_colors.append('#22C55E')
+                elif abs_v <= abs(avg_net) + 2 * std_loss:
+                    net_colors.append('#F59E0B')
+                else:
+                    net_colors.append('#EF4444')
 
-                y_min_val = flow['Net Loss'].min()
-                y_max_val = flow['Net Loss'].max()
-                y_pad = max(abs(y_min_val), abs(y_max_val)) * 0.15
-                for y0, y1, color in [
-                    (avg_net - 1 * std_loss, avg_net + 1 * std_loss, 'rgba(34,197,94,0.06)'),
-                    (avg_net - 2 * std_loss, avg_net - 1 * std_loss, 'rgba(245,158,11,0.06)'),
-                    (avg_net + 1 * std_loss, avg_net + 2 * std_loss, 'rgba(245,158,11,0.06)'),
-                ]:
-                    fig_loss.add_shape(
-                        type="rect", xref="paper", yref="y",
-                        x0=0, x1=1, y0=y0, y1=y1,
-                        fillcolor=color, line_width=0, layer="below"
-                    )
+            fig_loss.add_trace(go.Scatter(
+                x=flow["Date"],
+                y=flow["Net Deviation"],
+                mode='lines+markers',
+                name='Net Deviation',
+                line=dict(color='rgba(255,255,255,0.4)', width=1.5),
+                marker=dict(
+                    size=8,
+                    color=net_colors,
+                    line=dict(width=1.5, color='rgba(255,255,255,0.6)')
+                ),
+                connectgaps=True,
+                hovertemplate='<b>Net Deviation</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
+            ), secondary_y=False)
 
-                fig_loss.add_trace(go.Bar(
-                    x=flow['Date'], y=flow['Deviation Port'],
-                    name='Port Deviation',
-                    marker=dict(color='rgba(239,68,68,0.7)',
-                           line=dict(width=0.5, color='rgba(239,68,68,0.9)')),
-                    hovertemplate='<b>Port Deviation</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
-                ), secondary_y=False)
-                ), secondary_y=False)
+            fig_loss.add_trace(go.Scatter(
+                x=flow["Date"],
+                y=flow["Cum Net Deviation"],
+                mode='lines',
+                name='Cumulative Deviation',
+                line=dict(color='#06b6d4', width=2.5, dash='dot'),
+                fill='tozeroy',
+                fillcolor='rgba(6,182,212,0.06)',
+                connectgaps=True,
+                hovertemplate='<b>Cumulative Deviation</b><br>%{y:,.0f} ton<extra></extra>',
+            ), secondary_y=True)
 
-                fig_loss.add_trace(go.Bar(
-                    x=flow['Date'], y=flow['Deviation CPP'],
-                    name='CPP33 Deviation',
-                    marker=dict(color='rgba(234,179,8,0.7)',
-                           line=dict(width=0.5, color='rgba(234,179,8,0.9)')),
-                    hovertemplate='<b>CPP33 Deviation</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
-                ), secondary_y=False)
+            fig_loss.add_hline(y=0, line_color='rgba(148,163,184,0.5)', line_width=1.5)
 
-                net_colors = []
-                for v in flow['Net Loss'].values:
-                    abs_v = abs(v)
-                    if abs_v <= abs(avg_net) + 1 * std_loss:
-                        net_colors.append('#22C55E')
-                    elif abs_v <= abs(avg_net) + 2 * std_loss:
-                        net_colors.append('#F59E0B')
-                    else:
-                        net_colors.append('#EF4444')
-
-                fig_loss.add_trace(go.Scatter(
-                    x=flow['Date'], y=flow['Net Loss'],
-                    mode='lines+markers',
-                    name='Net Loss',
-                    line=dict(color='rgba(255,255,255,0.4)', width=1.5),
-                    marker=dict(size=8, color=net_colors,
-                            line=dict(width=1.5, color='rgba(255,255,255,0.6)')),
-                    connectgaps=True,
-                    hovertemplate='<b>Net Loss</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
-                ), secondary_y=False)
-
-                fig_loss.add_trace(go.Scatter(
-                    x=flow['Date'], y=flow['Cum Net Loss'],
-                    mode='lines',
-                    name='Cumulative Loss',
-                    line=dict(color='#06b6d4', width=2.5, dash='dot'),
-                    fill='tozeroy',
-                    fillcolor='rgba(6,182,212,0.06)',
-                    connectgaps=True,
-                    hovertemplate='<b>Cumulative</b><br>%{y:,.0f} ton<extra></extra>',
-                ), secondary_y=True)
-
-                fig_loss.add_hline(y=0, line_color='rgba(148,163,184,0.5)', line_width=1.5)
-
-                fig_loss.add_hline(
-                    y=avg_net, line_dash='dot',
-                    line_color='rgba(239,68,68,0.4)', line_width=1,
-                    annotation_text=f'Avg {avg_net:,.0f} t',
-                    annotation_position='bottom right',
-                    annotation_font=dict(size=9, color='#F87171'))
-
-                fig_loss.add_hline(
-                    y=avg_net + 2 * std_loss,
-                    line_color='#eab308', line_width=1, line_dash='dash',
-                    annotation_text='+2σ', annotation_position='top right',
-                    annotation_font=dict(size=8, color='#eab308'))
-
-                fig_loss.add_hline(
-                    y=avg_net - 2 * std_loss,
-                    line_color='#eab308', line_width=1, line_dash='dash',
-                    annotation_text='-2σ', annotation_position='bottom right',
-                    annotation_font=dict(size=8, color='#eab308'))
-
-                worst_idx = flow['Net Loss'].idxmin()
-                fig_loss.add_annotation(
-                    x=flow.loc[worst_idx, 'Date'],
-                    y=flow.loc[worst_idx, 'Net Loss'],
-                    text=f"▼ Worst: {flow.loc[worst_idx, 'Net Loss']:,.0f} t",
-                    showarrow=True, arrowhead=2,
-                    arrowwidth=1.5, arrowcolor='#EF4444',
-                    ax=40, ay=-30,
-                    font=dict(size=10, color='#FFF'),
-                    bgcolor='rgba(239,68,68,0.85)', borderpad=4)
-
-                best_idx = flow['Net Loss'].abs().idxmin()
-                fig_loss.add_annotation(
-                    x=flow.loc[best_idx, 'Date'],
-                    y=flow.loc[best_idx, 'Net Loss'],
-                    text=f"✓ Best: {flow.loc[best_idx, 'Net Loss']:,.0f} t",
-                    showarrow=True, arrowhead=2,
-                    arrowwidth=1.5, arrowcolor='#22C55E',
-                    ax=-40, ay=-25,
-                    font=dict(size=10, color='#FFF'),
-                    bgcolor='rgba(34,197,94,0.85)', borderpad=4)
-
-                fig_loss.update_layout(
-                    height=460,
-                    barmode='relative',
-                    font=dict(family='Inter, sans-serif', color='#CBD5E1', size=11),
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(
-                        gridcolor='rgba(148,163,184,0.08)',
-                        title='', tickformat='%d %b',
-                        tickfont=dict(size=10, color='#94A3B8'),
-                        showline=True,
-                        linecolor='rgba(148,163,184,0.2)',
-                        rangeselector=dict(
-                            buttons=list([
-                                dict(count=1, label="1M", step="month", stepmode="backward"),
-                                dict(count=3, label="3M", step="month", stepmode="backward"),
-                                dict(step="all", label="ALL"),
-                            ]),
-                            bgcolor='rgba(30,30,50,0.8)',
-                            activecolor='rgba(59,130,246,0.4)',
-                            font=dict(size=10, color='#CBD5E1'),
-                        ),
-                        rangeslider=dict(visible=True, thickness=0.06),
-                        type="date",
-                    ),
-                    showlegend=True,
-                    legend=dict(
-                        orientation='h', yanchor='bottom', y=1.08,
-                        xanchor='center', x=0.5,
-                        font=dict(size=10, color='#E2E8F0'),
-                        bgcolor='rgba(0,0,0,0)',
-                    ),
-                    hovermode='x unified',
-                    margin=dict(l=60, r=60, t=70, b=10),
-                )
-
-                fig_loss.update_yaxes(
-                    title=dict(text='Deviation (ton)', font=dict(color='#94A3B8', size=11)),
-                    tickformat=',.0f',
+            fig_loss.update_layout(
+                height=460,
+                barmode='relative',
+                font=dict(family='Inter, sans-serif', color='#CBD5E1', size=11),
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(
                     gridcolor='rgba(148,163,184,0.08)',
+                    title='',
+                    tickformat='%d %b',
                     tickfont=dict(size=10, color='#94A3B8'),
-                    showline=False, zeroline=False,
-                    secondary_y=False,
-                )
+                    showline=True,
+                    linecolor='rgba(148,163,184,0.2)',
+                    rangeslider=dict(visible=True, thickness=0.06),
+                    type="date",
+                ),
+                showlegend=True,
+                legend=dict(
+                    orientation='h',
+                    yanchor='bottom',
+                    y=1.08,
+                    xanchor='center',
+                    x=0.5,
+                    font=dict(size=10, color='#E2E8F0'),
+                    bgcolor='rgba(0,0,0,0)',
+                ),
+                hovermode='x unified',
+                margin=dict(l=60, r=60, t=70, b=10),
+            )
 
-                fig_loss.update_yaxes(
-                    title=dict(text='Cumulative Deviation (ton)', font=dict(color='#06b6d4', size=11)),
-                    tickformat=',.0f',
-                    gridcolor='rgba(0,0,0,0)',
-                    tickfont=dict(size=10, color='#06b6d4'),
-                    showline=False, zeroline=False,
-                    secondary_y=True,
-                )
+            fig_loss.update_yaxes(
+                title=dict(text='Deviation (ton)', font=dict(color='#94A3B8', size=11)),
+                tickformat=',.0f',
+                gridcolor='rgba(148,163,184,0.08)',
+                tickfont=dict(size=10, color='#94A3B8'),
+                showline=False,
+                zeroline=False,
+                secondary_y=False,
+            )
 
-                st.plotly_chart(fig_loss, use_container_width=True, key='loss_analysis')
+            fig_loss.update_yaxes(
+                title=dict(text='Cumulative Deviation (ton)', font=dict(color='#06b6d4', size=11)),
+                tickformat=',.0f',
+                gridcolor='rgba(0,0,0,0)',
+                tickfont=dict(size=10, color='#06b6d4'),
+                showline=False,
+                zeroline=False,
+                secondary_y=True,
+            )
+
+            st.plotly_chart(fig_loss, use_container_width=True, key='loss_analysis')
 
     with tab2:
         # ══════════════════════════════════════════════════════════

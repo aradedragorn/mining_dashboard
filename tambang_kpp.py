@@ -2985,913 +2985,13 @@ def main():
             cm_alert = df_cm_data[df_cm_data['Status_CM'].isin(['Critical', 'Caution'])][['Date', 'TWB_CM', 'CM_WB', 'Dev_CM_Relatif_Pct', 'Status_CM']].copy() if len(df_cm_data) > 0 else pd.DataFrame()
             st.markdown(render_alert_table(cm_alert, ['Date', 'TWB_CM', 'CM_WB', 'Dev_CM_Relatif_Pct', 'Status_CM'], 'Dev_CM_Relatif_Pct', 'Status_CM'), unsafe_allow_html=True)
 
-        # ══════════════════════════════════════════════════════════
-        # EXPORT
-        # ══════════════════════════════════════════════════════════
-        st.markdown("""
-        <div class="section-header">
-            <h3 class="section-title"> Export Reports</h3>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── Chart themes for export ──
-        chart_theme_export = dict(
-            font=dict(family='Inter, Arial, sans-serif', color='#E2E8F0', size=12),
-            plot_bgcolor='#1E293B',
-            paper_bgcolor='#1E293B',
-            margin=dict(l=60, r=40, t=55, b=45),
-            hovermode='x unified'
-        )
-        chart_theme_st = dict(
-            font=dict(family='Inter, Arial, sans-serif', color='#E2E8F0', size=11),
-            plot_bgcolor='rgba(0,0,0,0)',
-            paper_bgcolor='rgba(0,0,0,0)',
-            margin=dict(l=50, r=30, t=50, b=40),
-            hovermode='x unified'
-        )
-        axis_style = dict(
-            gridcolor='rgba(148,163,184,0.15)',
-            tickfont=dict(size=11, color='#CBD5E1'),
-            linecolor='rgba(148,163,184,0.25)',
-            showline=True,
-            title_font=dict(size=12, color='#CBD5E1')
-        )
-        legend_cfg = dict(
-            orientation='h',
-            yanchor='bottom',
-            y=1.02,
-            xanchor='right',
-            x=1,
-            font=dict(size=10, color='#CBD5E1'),
-            bgcolor='rgba(0,0,0,0)'
-        )
-
-        # ── 8 Chart functions ──
-        def make_fig1(theme):
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=df_ob['Bulan'], y=df_ob['TC'],
-                mode='lines+markers', name='TC (Target)',
-                line=dict(color='#60A5FA', width=2.5),
-                marker=dict(size=7, color='#60A5FA'),
-                hovertemplate='TC: %{y:,.0f} BCM<extra></extra>'
-            ))
-            fig.add_trace(go.Scatter(
-                x=df_ob['Bulan'], y=df_ob['JS'],
-                mode='lines+markers', name='JS (Realisasi)',
-                line=dict(color='#34D399', width=2.5),
-                marker=dict(size=7, symbol='diamond', color='#34D399'),
-                hovertemplate='JS: %{y:,.0f} BCM<extra></extra>'
-            ))
-            fig.update_layout(
-                **theme,
-                height=350,
-                title=dict(text='OB Monthly: TC vs JS Volume (BCM)', font=dict(size=14, color='#F1F5F9')),
-                xaxis=dict(**axis_style, title='Bulan'),
-                yaxis=dict(**axis_style, title='Volume (BCM)', zeroline=False),
-                legend=legend_cfg
-            )
-            return fig
-
-        def make_fig2(theme):
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=df_ob['Bulan'],
-                y=df_ob['Dev_Relatif_Pct'],
-                marker_color=[scolor(s) for s in df_ob['Status']],
-                text=df_ob['Dev_Relatif_Pct'].apply(lambda x: f"{x:+.1f}%"),
-                textposition='outside',
-                textfont=dict(size=9, color='#CBD5E1'),
-                hovertemplate='Deviasi: %{y:.2f}%<extra></extra>'
-            ))
-            for yv, clr, dsh in [(0,'#64748B','solid'),(2,'#F59E0B','dash'),(-2,'#F59E0B','dash'),(3,'#EF4444','dash'),(-3,'#EF4444','dash')]:
-                ann = '' if yv == 0 else (f'{"Caution" if abs(yv)==2 else "Critical"} ±{abs(yv)}%' if yv > 0 else '')
-                fig.add_hline(
-                    y=yv,
-                    line_color=clr,
-                    line_dash=dsh,
-                    line_width=1,
-                    annotation_text=ann,
-                    annotation_position='right',
-                    annotation_font_size=9,
-                    annotation_font_color=clr
-                )
-            disp_line = df_ob['Dev_Relatif_Pct'].abs().mean()
-            fig.add_hline(
-                y=disp_line,
-                line_color='#A78BFA',
-                line_dash='dot',
-                line_width=1,
-                annotation_text=f'Avg: {disp_line:.2f}%',
-                annotation_position='top right',
-                annotation_font_size=9,
-                annotation_font_color='#A78BFA'
-            )
-            fig.update_layout(
-                **theme,
-                height=350,
-                showlegend=False,
-                title=dict(text='OB Deviation Trend (%)', font=dict(size=14, color='#F1F5F9')),
-                xaxis=dict(**axis_style, title='Bulan'),
-                yaxis=dict(**axis_style, title='Deviasi Relatif (%)', zeroline=False)
-            )
-            return fig
-
-        def make_fig3(theme):
-            fig = go.Figure()
-            if len(df_ch) > 0:
-                fig.add_trace(go.Scatter(
-                    x=df_ch['Date'], y=df_ch['TWB_CH'],
-                    mode='lines+markers', name='TWB (Actual)',
-                    line=dict(color='#60A5FA', width=2),
-                    marker=dict(size=5),
-                    hovertemplate='TWB: %{y:,.0f}<extra></extra>'
-                ))
-                fig.add_trace(go.Scatter(
-                    x=df_ch['Date'], y=df_ch['CH_WB'],
-                    mode='lines', name='WB (Target)',
-                    line=dict(color='#34D399', width=2, dash='dash'),
-                    hovertemplate='WB: %{y:,.0f}<extra></extra>'
-                ))
-            fig.update_layout(
-                **theme,
-                height=320,
-                title=dict(text='Coal Hauling: TWB vs WB (ton)', font=dict(size=14, color='#F1F5F9')),
-                xaxis=dict(**axis_style, tickformat='%d %b'),
-                yaxis=dict(**axis_style, title='Ton', zeroline=False),
-                legend=legend_cfg
-            )
-            return fig
-
-        def make_fig4(theme):
-            fig = go.Figure()
-            if len(df_cm_data) > 0:
-                fig.add_trace(go.Scatter(
-                    x=df_cm_data['Date'], y=df_cm_data['TWB_CM'],
-                    mode='lines+markers', name='TWB (Actual)',
-                    line=dict(color='#60A5FA', width=2),
-                    marker=dict(size=5),
-                    hovertemplate='TWB: %{y:,.0f}<extra></extra>'
-                ))
-                fig.add_trace(go.Scatter(
-                    x=df_cm_data['Date'], y=df_cm_data['CM_WB'],
-                    mode='lines', name='WB (Target)',
-                    line=dict(color='#34D399', width=2, dash='dash'),
-                    hovertemplate='WB: %{y:,.0f}<extra></extra>'
-                ))
-            fig.update_layout(
-                **theme,
-                height=320,
-                title=dict(text='Coal Mining: TWB vs WB (ton)', font=dict(size=14, color='#F1F5F9')),
-                xaxis=dict(**axis_style, tickformat='%d %b'),
-                yaxis=dict(**axis_style, title='Ton', zeroline=False),
-                legend=legend_cfg
-            )
-            return fig
-
-        def make_fig5(theme):
-            fig = go.Figure()
-            if len(df_ch) > 0:
-                fig.add_trace(go.Bar(
-                    x=df_ch['Date'], y=df_ch['Dev_CH_Relatif_Pct'],
-                    marker_color=[scolor(s) for s in df_ch['Status_CH']],
-                    hovertemplate='CH Dev: %{y:.1f}%<extra></extra>'
-                ))
-                fig.add_hline(y=0, line_color='#64748B', line_width=0.5)
-                fig.add_hline(y=3, line_color='#EF4444', line_dash='dash', line_width=1,
-                              annotation_text='Critical +3%', annotation_position='top right',
-                              annotation_font_size=8, annotation_font_color='#EF4444')
-                fig.add_hline(y=-3, line_color='#EF4444', line_dash='dash', line_width=1,
-                              annotation_text='Critical -3%', annotation_position='bottom right',
-                              annotation_font_size=8, annotation_font_color='#EF4444')
-            fig.update_layout(
-                **theme,
-                height=280,
-                showlegend=False,
-                title=dict(text='CH Daily Deviation (%)', font=dict(size=14, color='#F1F5F9')),
-                xaxis=dict(**axis_style, tickformat='%d %b'),
-                yaxis=dict(**axis_style, title='Deviasi (%)', zeroline=False)
-            )
-            return fig
-
-        def make_fig6(theme):
-            fig = go.Figure()
-            if len(df_cm_data) > 0:
-                fig.add_trace(go.Bar(
-                    x=df_cm_data['Date'], y=df_cm_data['Dev_CM_Relatif_Pct'],
-                    marker_color=[scolor(s) for s in df_cm_data['Status_CM']],
-                    hovertemplate='CM Dev: %{y:.1f}%<extra></extra>'
-                ))
-                fig.add_hline(y=0, line_color='#64748B', line_width=0.5)
-                fig.add_hline(y=3, line_color='#EF4444', line_dash='dash', line_width=1,
-                              annotation_text='Critical +3%', annotation_position='top right',
-                              annotation_font_size=8, annotation_font_color='#EF4444')
-                fig.add_hline(y=-3, line_color='#EF4444', line_dash='dash', line_width=1,
-                              annotation_text='Critical -3%', annotation_position='bottom right',
-                              annotation_font_size=8, annotation_font_color='#EF4444')
-            fig.update_layout(
-                **theme,
-                height=280,
-                showlegend=False,
-                title=dict(text='CM Daily Deviation (%)', font=dict(size=14, color='#F1F5F9')),
-                xaxis=dict(**axis_style, tickformat='%d %b'),
-                yaxis=dict(**axis_style, title='Deviasi (%)', zeroline=False)
-            )
-            return fig
-
-        def make_fig7(theme):
-            fig = go.Figure()
-            if flow is not None and len(flow) > 0:
-                fig.add_trace(go.Scatter(
-                    x=flow['Date'], y=flow['CM TWB'],
-                    mode='lines+markers', name='CM TWB',
-                    line=dict(color='#60A5FA', width=2.5),
-                    marker=dict(size=6, color='#60A5FA'),
-                    hovertemplate='CM: %{y:,.0f}<extra></extra>'
-                ))
-                fig.add_trace(go.Scatter(
-                    x=flow['Date'], y=flow['CH TWB'],
-                    mode='lines+markers', name='CH TWB',
-                    line=dict(color='#34D399', width=2.5),
-                    marker=dict(size=6, color='#34D399'),
-                    hovertemplate='CH: %{y:,.0f}<extra></extra>'
-                ))
-                fig.add_trace(go.Scatter(
-                    x=flow['Date'], y=flow['Sales'],
-                    mode='lines+markers', name='Sales',
-                    line=dict(color='#A78BFA', width=2.5),
-                    marker=dict(size=6, color='#A78BFA'),
-                    hovertemplate='Sales: %{y:,.0f}<extra></extra>'
-                ))
-                fig.add_hline(
-                    y=disp_cm,
-                    line_color='#60A5FA',
-                    line_dash='dot',
-                    line_width=1,
-                    annotation_text=f'Avg CM {disp_cm:,.0f}',
-                    annotation_position='top left',
-                    annotation_font=dict(size=9, color='#60A5FA')
-                )
-                fig.add_hline(
-                    y=disp_sales,
-                    line_color='#A78BFA',
-                    line_dash='dot',
-                    line_width=1,
-                    annotation_text=f'Avg Sales {disp_sales:,.0f}',
-                    annotation_position='bottom right',
-                    annotation_font=dict(size=9, color='#A78BFA')
-                )
-            fig.update_layout(
-                **theme,
-                height=380,
-                title=dict(text='Material Throughput (ton)', font=dict(size=15, color='#F1F5F9', family='Inter, Arial, sans-serif')),
-                xaxis=dict(**axis_style, tickformat='%d %b', title='Date'),
-                yaxis=dict(**axis_style, title='Ton', zeroline=False),
-                legend=dict(
-                    orientation='h', yanchor='bottom', y=1.02, xanchor='center', x=0.5,
-                    font=dict(size=11, color='#E2E8F0'),
-                    bgcolor='rgba(30,41,59,0.8)',
-                    bordercolor='rgba(148,163,184,0.2)',
-                    borderwidth=1
-                )
-            )
-            return fig
-
-        def make_fig8(theme):
-            fig = go.Figure()
-            if flow is not None and len(flow) > 0:
-                fig.add_trace(go.Scatter(
-                    x=flow['Date'], y=flow['CH Flow Ratio (%)'],
-                    mode='lines+markers', name='CH Ratio',
-                    line=dict(color='#34D399', width=3),
-                    marker=dict(size=8, color='#34D399', line=dict(color='#ffffff', width=1)),
-                    fill='tozeroy',
-                    fillcolor='rgba(52,211,153,0.10)',
-                    hovertemplate='CH Ratio: %{y:.1f}%<extra></extra>'
-                ))
-                fig.add_trace(go.Scatter(
-                    x=flow['Date'], y=flow['Sales Flow Ratio (%)'],
-                    mode='lines+markers', name='Sales Ratio',
-                    line=dict(color='#60A5FA', width=2, dash='dot'),
-                    marker=dict(size=4, color='#60A5FA'),
-                    hovertemplate='Sales Ratio: %{y:.1f}%<extra></extra>'
-                ))
-                fig.add_hline(
-                    y=100,
-                    line_color='#F59E0B',
-                    line_dash='dash',
-                    line_width=1.5,
-                    annotation_text='Target 100%',
-                    annotation_position='top right',
-                    annotation_font=dict(size=10, color='#F59E0B')
-                )
-                disp_ratio_val = flow['CH Flow Ratio (%)'].mean()
-                fig.add_hline(
-                    y=disp_ratio_val,
-                    line_color='#34D399',
-                    line_dash='dot',
-                    line_width=1,
-                    annotation_text=f'Avg {disp_ratio_val:.1f}%',
-                    annotation_position='bottom left',
-                    annotation_font=dict(size=9, color='#34D399')
-                )
-                ratio_min = min(50, flow['CH Flow Ratio (%)'].min() - 5, flow['Sales Flow Ratio (%)'].min() - 5)
-                ratio_max = max(130, flow['CH Flow Ratio (%)'].max() + 5, flow['Sales Flow Ratio (%)'].max() + 5)
-            else:
-                ratio_min, ratio_max = 50, 130
-
-            fig.update_layout(
-                **theme,
-                height=380,
-                title=dict(text='Flow Ratio (%)', font=dict(size=15, color='#F1F5F9', family='Inter, Arial, sans-serif')),
-                xaxis=dict(**axis_style, tickformat='%d %b', title='Date'),
-                yaxis=dict(**axis_style, title='Flow Ratio (%)', zeroline=False, range=[ratio_min, ratio_max]),
-                legend=dict(
-                    orientation='h', yanchor='bottom', y=1.02, xanchor='center', x=0.5,
-                    font=dict(size=11, color='#E2E8F0'),
-                    bgcolor='rgba(30,41,59,0.8)',
-                    bordercolor='rgba(148,163,184,0.2)',
-                    borderwidth=1
-                )
-            )
-            return fig
-
-        # ══════════════════════════════════════════════════════════
-        # 3 EXPORT COLUMNS
-        # ══════════════════════════════════════════════════════════
-        exp1, exp2, exp3 = st.columns(3)
-
-        # ═══════ EXCEL EXPORT ═══════
-        with exp1:
-            st.markdown("""
-            <div style="background:rgba(22,101,52,0.08);padding:10px 12px;border-radius:8px;
-                border-left:3px solid #16A34A;margin-bottom:8px;">
-                <div style="font-size:0.82rem;font-weight:700;color:#e5e7eb;">📊 Professional Excel Report</div>
-                <div style="font-size:0.72rem;color:#94A3B8;margin-top:2px;">7 sheets • Executive Dashboard • KPP Branding • Conditional formatting</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-            from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
-            from openpyxl.utils import get_column_letter
-
-            excel_buffer = io.BytesIO()
-
-            C = {
-                'kpp_dk': '166534', 'kpp_md': '16A34A', 'kpp_lt': 'DCFCE7', 'kpp_bg': 'F0FDF4',
-                'gold_md': 'D97706',
-                'gray1': '1F2937', 'gray2': '6B7280', 'gray3': 'F3F4F6',
-                'green_txt': '059669', 'green_bg': 'D1FAE5',
-                'amber_txt': 'D97706', 'amber_bg': 'FEF3C7',
-                'red_txt': 'DC2626', 'red_bg': 'FEE2E2',
-                'white': 'FFFFFF', 'bdr': 'D1D5DB',
-            }
-
-            hf = Font(bold=True, color=C['white'], size=10)
-            bd = Border(
-                left=Side(style='thin', color=C['bdr']), right=Side(style='thin', color=C['bdr']),
-                top=Side(style='thin', color=C['bdr']), bottom=Side(style='thin', color=C['bdr'])
-            )
-            al_c = Alignment(horizontal='center', vertical='center', wrap_text=True)
-            al_l = Alignment(horizontal='left', vertical='center', wrap_text=True)
-            af = PatternFill(start_color=C['kpp_bg'], end_color=C['kpp_bg'], fill_type='solid')
-
-            sfill = {
-                'Normal': PatternFill(start_color=C['green_bg'], end_color=C['green_bg'], fill_type='solid'),
-                'Good': PatternFill(start_color=C['green_bg'], end_color=C['green_bg'], fill_type='solid'),
-                'Caution': PatternFill(start_color=C['amber_bg'], end_color=C['amber_bg'], fill_type='solid'),
-                'Warning': PatternFill(start_color=C['amber_bg'], end_color=C['amber_bg'], fill_type='solid'),
-                'Critical': PatternFill(start_color=C['red_bg'], end_color=C['red_bg'], fill_type='solid'),
-            }
-            sfont = {
-                'Normal': C['green_txt'], 'Good': C['green_txt'],
-                'Caution': C['amber_txt'], 'Warning': C['amber_txt'],
-                'Critical': C['red_txt'],
-            }
-
-            def style_data_sheet(ws, title_text, hdr_row, data_start_row, merge_cols,
-                                 status_col_idx=None, freeze_cell='A2',
-                                 num_fmt_cols=None, pct_fmt_cols=None):
-                ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=merge_cols)
-                ws['A1'] = title_text
-                ws['A1'].font = Font(size=14, bold=True, color=C['white'])
-                ws['A1'].fill = PatternFill(start_color=C['kpp_dk'], end_color=C['kpp_dk'], fill_type='solid')
-                ws['A1'].alignment = al_c
-                ws.row_dimensions[1].height = 30
-
-                for col in range(1, merge_cols + 1):
-                    cell = ws.cell(row=hdr_row, column=col)
-                    cell.font = hf
-                    cell.fill = PatternFill(start_color=C['kpp_md'], end_color=C['kpp_md'], fill_type='solid')
-                    cell.alignment = al_c
-                    cell.border = bd
-
-                for ri, row in enumerate(ws.iter_rows(min_row=data_start_row, max_row=ws.max_row, max_col=merge_cols)):
-                    for cell in row:
-                        cell.border = bd
-                        cell.alignment = al_c
-                        if ri % 2 == 1:
-                            cell.fill = af
-                        if status_col_idx and cell.column == status_col_idx:
-                            sv = str(cell.value) if cell.value else ''
-                            if sv in sfill:
-                                cell.fill = sfill[sv]
-                                cell.font = Font(bold=True, size=9, color=sfont.get(sv, C['gray1']))
-                        if num_fmt_cols and cell.column in num_fmt_cols:
-                            cell.number_format = '#,##0'
-                        if pct_fmt_cols and cell.column in pct_fmt_cols:
-                            cell.number_format = '0.00'
-
-                for ci in range(1, merge_cols + 1):
-                    ml = 0
-                    for row in ws.iter_rows(min_col=ci, max_col=ci):
-                        for cell in row:
-                            if cell.value:
-                                ml = max(ml, len(str(cell.value)[:40]))
-                    ws.column_dimensions[get_column_letter(ci)].width = max(min(ml + 3, 22), 10)
-
-                ws.freeze_panes = freeze_cell
-
-            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                # SHEET 1: Executive Dashboard
-                ed = []
-                ed.append(['KPP MINING — DATA ANALYSIS REPORT', '', '', '', '', '', ''])
-                ed.append([f'PT Kalimantan Prima Persada | Generated: {datetime.now().strftime("%d %b %Y, %H:%M")}', '', '', '', '', '', ''])
-                ed.append(['', '', '', '', '', '', ''])
-                ed.append(['KEY PERFORMANCE INDICATORS', '', '', '', '', '', ''])
-                ed.append(['Overall Perf', 'Total Periods', 'Critical Alerts', 'CH Ratio', 'OB Avg Dev', 'CH Avg Dev', 'CM Avg Dev'])
-                ed.append([
-                    round(perf, 1), total_normal + total_caution + total_critical,
-                    total_critical, round(disp_ch_ratio, 1),
-                    round(ob_disp_dev, 2), round(ch_disp_dev, 2), round(cm_disp_dev, 2)
-                ])
-                ed.append(['', '', '', '', '', '', ''])
-                ed.append(['OVERBURDEN (OB)', 'Value', 'Status', '', 'COAL HAULING (CH)', 'Value', 'Status'])
-                ed.append(['Total Periods', len(df_ob), '', '', 'Total Periods', len(df_ch), ''])
-                ed.append(['Avg Dev (%)', round(ob_disp_dev, 2), 'Normal' if ob_disp_dev <= 2 else 'Caution' if ob_disp_dev <= 3 else 'Critical', '', 'Avg Dev (%)', round(ch_disp_dev, 2), 'Normal' if ch_disp_dev <= 2 else 'Caution' if ch_disp_dev <= 3 else 'Critical'])
-                ed.append(['Total TC (BCM)', round(df_ob["TC"].sum()), '', '', 'Avg TWB', round(df_ch["TWB_CH"].mean()) if len(df_ch) > 0 else '-', ''])
-                ed.append(['Total JS (BCM)', round(df_ob["JS"].sum()), '', '', 'Avg WB Target', round(df_ch["CH_WB"].mean()) if len(df_ch) > 0 else '-', ''])
-                ed.append(['', '', '', '', '', '', ''])
-                ed.append(['COAL MINING (CM)', 'Value', 'Status', '', 'FLOW SUMMARY', 'Value', ''])
-                ed.append(['Total Periods', len(df_cm_data), '', '', 'Avg CM TWB', round(disp_cm), ''])
-                ed.append(['Avg Dev (%)', round(cm_disp_dev, 2), 'Normal' if cm_disp_dev <= 2 else 'Caution' if cm_disp_dev <= 3 else 'Critical', '', 'Avg CH TWB', round(disp_ch), ''])
-                ed.append(['Avg TWB', round(df_cm_data["TWB_CM"].mean()) if len(df_cm_data) > 0 else '-', '', '', 'Avg Sales', round(disp_sales), ''])
-                ed.append(['Avg WB Target', round(df_cm_data["CM_WB"].mean()) if len(df_cm_data) > 0 else '-', '', '', 'CH Ratio', round(disp_ch_ratio, 1), ''])
-                ed.append(['', '', '', '', 'Sales Ratio', round(disp_sales_ratio, 1), ''])
-                ed.append(['', '', '', '', 'CPP Dev', round(disp_dev_cpp), ''])
-                ed.append(['', '', '', '', 'Port Dev', round(disp_dev_port), ''])
-
-                df_exec = pd.DataFrame(ed)
-                df_exec.to_excel(writer, sheet_name='Executive Dashboard', index=False, header=False)
-
-                # SHEET 2: OB Analysis
-                df_ob_exp = df_ob[['Bulan','TC','JS','Dev_Absolut','Dev_Relatif_Pct','Status']].copy()
-                df_ob_exp['Dev_Relatif_Pct'] = df_ob_exp['Dev_Relatif_Pct'].round(2)
-                df_ob_exp['Dev_Absolut'] = df_ob_exp['Dev_Absolut'].round(0)
-                df_ob_exp.columns = ['Month', 'TC (BCM)', 'JS (BCM)', 'Dev (Absolute)', 'Dev (%)', 'Status']
-                df_ob_exp.to_excel(writer, sheet_name='OB Analysis', index=False, startrow=2)
-
-                # SHEET 3: CH Analysis
-                df_ch_exp = df_ch_cm.dropna(subset=['CH_WB','TWB_CH']).copy()
-                ch_cols = [c for c in ['Date','Port_Darat','Port_Laut','Port_Total','CH_WB','TWB_CH','Dev_CH_Relatif_Pct','Status_CH'] if c in df_ch_exp.columns]
-                df_ch_exp = df_ch_exp[ch_cols].copy()
-                if 'Dev_CH_Relatif_Pct' in df_ch_exp.columns:
-                    df_ch_exp['Dev_CH_Relatif_Pct'] = df_ch_exp['Dev_CH_Relatif_Pct'].round(2)
-                if 'Date' in df_ch_exp.columns:
-                    df_ch_exp['Date'] = pd.to_datetime(df_ch_exp['Date']).dt.strftime('%Y-%m-%d')
-                col_map_ch = {'Date':'Date','Port_Darat':'Port Darat','Port_Laut':'Port Laut','Port_Total':'Port Total','CH_WB':'WB Target','TWB_CH':'TWB Actual','Dev_CH_Relatif_Pct':'Dev (%)','Status_CH':'Status'}
-                df_ch_exp.columns = [col_map_ch.get(c, c) for c in ch_cols]
-                df_ch_exp.to_excel(writer, sheet_name='CH Analysis', index=False, startrow=2)
-
-                # SHEET 4: CM Analysis
-                df_cm_exp = df_ch_cm.dropna(subset=['CM_WB','TWB_CM']).copy()
-                cm_cols = [c for c in ['Date','CPP_Raw','CPP_Product','CPP_Total','Sales','CM_WB','TWB_CM','Dev_CM_Relatif_Pct','Status_CM'] if c in df_cm_exp.columns]
-                df_cm_exp = df_cm_exp[cm_cols].copy()
-                if 'Dev_CM_Relatif_Pct' in df_cm_exp.columns:
-                    df_cm_exp['Dev_CM_Relatif_Pct'] = df_cm_exp['Dev_CM_Relatif_Pct'].round(2)
-                if 'Date' in df_cm_exp.columns:
-                    df_cm_exp['Date'] = pd.to_datetime(df_cm_exp['Date']).dt.strftime('%Y-%m-%d')
-                col_map_cm = {'Date':'Date','CPP_Raw':'CPP Raw','CPP_Product':'CPP Product','CPP_Total':'CPP Total','Sales':'Sales','CM_WB':'WB Target','TWB_CM':'TWB Actual','Dev_CM_Relatif_Pct':'Dev (%)','Status_CM':'Status'}
-                df_cm_exp.columns = [col_map_cm.get(c, c) for c in cm_cols]
-                df_cm_exp.to_excel(writer, sheet_name='CM Analysis', index=False, startrow=2)
-
-                # SHEET 5: Material Flow
-                if flow is not None and len(flow) > 0:
-                    df_fl = flow.copy()
-                    fl_cols = [c for c in [
-                        'Date','CM TWB','Delta CPP Stock','CH TWB','Deviation CPP',
-                        'Delta Port Stock','Sales','Deviation Port',
-                        'CH Flow Ratio (%)','Sales Flow Ratio (%)','Net Deviation'
-                    ] if c in df_fl.columns]
-                    df_fl = df_fl[fl_cols].copy()
-                    if 'Date' in df_fl.columns:
-                        df_fl['Date'] = pd.to_datetime(df_fl['Date']).dt.strftime('%Y-%m-%d')
-                    for ec in ['CH Flow Ratio (%)','Sales Flow Ratio (%)']:
-                        if ec in df_fl.columns:
-                            df_fl[ec] = df_fl[ec].round(1)
-                    for lc in ['Deviation CPP','Deviation Port','Net Deviation','Delta CPP Stock','Delta Port Stock']:
-                        if lc in df_fl.columns:
-                            df_fl[lc] = df_fl[lc].round(0)
-                    rename_fl = {
-                        'CM TWB':'CM TWB',
-                        'Delta CPP Stock':'Δ CPP Stock',
-                        'CH TWB':'CH TWB',
-                        'Deviation CPP':'Dev CPP',
-                        'Delta Port Stock':'Δ Port Stock',
-                        'Sales':'Sales',
-                        'Deviation Port':'Dev Port',
-                        'CH Flow Ratio (%)':'CH Ratio (%)',
-                        'Sales Flow Ratio (%)':'Sales Ratio (%)',
-                        'Net Deviation':'Net Deviation'
-                    }
-                    df_fl = df_fl.rename(columns=rename_fl)
-                    df_fl.to_excel(writer, sheet_name='Material Flow', index=False, startrow=2)
-
-                # SHEET 6: Performance Matrix
-                df_mx = matrix.copy()
-                df_mx.columns = ['Stage', 'Normal', 'Caution', 'Critical', 'Total', 'Avg Dev (%)']
-                df_mx['Avg Dev (%)'] = df_mx['Avg Dev (%)'].round(2)
-                total_row = pd.DataFrame([{
-                    'Stage': 'TOTAL',
-                    'Normal': df_mx['Normal'].sum(),
-                    'Caution': df_mx['Caution'].sum(),
-                    'Critical': df_mx['Critical'].sum(),
-                    'Total': df_mx['Total'].sum(),
-                    'Avg Dev (%)': round(df_mx['Avg Dev (%)'].mean(), 2)
-                }])
-                df_mx = pd.concat([df_mx, total_row], ignore_index=True)
-                df_mx.to_excel(writer, sheet_name='Performance Matrix', index=False, startrow=2)
-
-                # SHEET 7: Critical Alerts
-                alerts = []
-                for _, r in df_ob[df_ob['Status'].isin(['Caution','Critical'])].iterrows():
-                    alerts.append({
-                        'Priority': 'HIGH' if r['Status']=='Critical' else 'MEDIUM',
-                        'Stage': 'OB',
-                        'Period': r['Bulan'],
-                        'Dev (%)': round(r['Dev_Relatif_Pct'], 2),
-                        'Status': r['Status']
-                    })
-                if len(df_ch) > 0:
-                    for _, r in df_ch[df_ch['Status_CH'].isin(['Caution','Critical'])].iterrows():
-                        alerts.append({
-                            'Priority': 'HIGH' if r['Status_CH']=='Critical' else 'MEDIUM',
-                            'Stage': 'CH',
-                            'Period': str(r['Date'])[:10],
-                            'Dev (%)': round(r['Dev_CH_Relatif_Pct'], 2),
-                            'Status': r['Status_CH']
-                        })
-                if len(df_cm_data) > 0:
-                    for _, r in df_cm_data[df_cm_data['Status_CM'].isin(['Caution','Critical'])].iterrows():
-                        alerts.append({
-                            'Priority': 'HIGH' if r['Status_CM']=='Critical' else 'MEDIUM',
-                            'Stage': 'CM',
-                            'Period': str(r['Date'])[:10],
-                            'Dev (%)': round(r['Dev_CM_Relatif_Pct'], 2),
-                            'Status': r['Status_CM']
-                        })
-                if alerts:
-                    df_al = pd.DataFrame(alerts)
-                    sort_map = {'HIGH': 0, 'MEDIUM': 1}
-                    df_al['_sort'] = df_al['Priority'].map(sort_map)
-                    df_al = df_al.sort_values(['_sort', 'Dev (%)'], ascending=[True, False]).drop('_sort', axis=1)
-                    df_al.to_excel(writer, sheet_name='Critical Alerts', index=False, startrow=2)
-
-            # Post styling
-            excel_buffer.seek(0)
-            wb = openpyxl.load_workbook(excel_buffer)
-
-            # Executive Dashboard styling
-            if 'Executive Dashboard' in wb.sheetnames:
-                ws_e = wb['Executive Dashboard']
-                ws_e.merge_cells('A1:G1')
-                ws_e['A1'].font = Font(size=16, bold=True, color=C['white'])
-                ws_e['A1'].fill = PatternFill(start_color=C['kpp_dk'], end_color=C['kpp_dk'], fill_type='solid')
-                ws_e['A1'].alignment = al_c
-                ws_e.row_dimensions[1].height = 36
-
-                ws_e.merge_cells('A2:G2')
-                ws_e['A2'].font = Font(size=9, italic=True, color=C['kpp_dk'])
-                ws_e['A2'].fill = PatternFill(start_color=C['kpp_lt'], end_color=C['kpp_lt'], fill_type='solid')
-                ws_e['A2'].alignment = al_c
-                ws_e.row_dimensions[2].height = 20
-
-                ws_e.merge_cells('A4:G4')
-                ws_e['A4'].font = Font(size=11, bold=True, color=C['kpp_dk'])
-                ws_e['A4'].fill = PatternFill(start_color=C['kpp_lt'], end_color=C['kpp_lt'], fill_type='solid')
-                ws_e['A4'].alignment = al_l
-                ws_e.row_dimensions[4].height = 24
-
-                for col in range(1, 8):
-                    cell = ws_e.cell(row=5, column=col)
-                    cell.font = Font(size=9, bold=True, color=C['gray1'])
-                    cell.fill = PatternFill(start_color=C['gray3'], end_color=C['gray3'], fill_type='solid')
-                    cell.alignment = al_c
-                    cell.border = bd
-
-                for col in range(1, 8):
-                    cell = ws_e.cell(row=6, column=col)
-                    cell.font = Font(size=14, bold=True, color=C['kpp_dk'])
-                    cell.alignment = al_c
-                    cell.border = bd
-
-                for rn in [8, 14]:
-                    for col in range(1, 8):
-                        cell = ws_e.cell(row=rn, column=col)
-                        if cell.value and str(cell.value).strip():
-                            cell.font = Font(size=10, bold=True, color=C['white'])
-                            cell.fill = PatternFill(start_color=C['kpp_md'], end_color=C['kpp_md'], fill_type='solid')
-                            cell.alignment = al_c
-                            cell.border = bd
-
-                for rn in range(9, ws_e.max_row + 1):
-                    for col in range(1, 8):
-                        cell = ws_e.cell(row=rn, column=col)
-                        cell.border = bd
-                        cell.alignment = al_l if col in [1, 5] else al_c
-                        if rn % 2 == 0:
-                            cell.fill = PatternFill(start_color=C['kpp_bg'], end_color=C['kpp_bg'], fill_type='solid')
-                        sv = str(cell.value) if cell.value else ''
-                        if sv in sfill:
-                            cell.fill = sfill[sv]
-                            cell.font = Font(size=9, bold=True, color=sfont.get(sv, C['gray1']))
-
-                for letter, w in [('A',22),('B',15),('C',12),('D',2),('E',22),('F',15),('G',12)]:
-                    ws_e.column_dimensions[letter].width = w
-                ws_e.freeze_panes = 'A7'
-
-            # Data sheets styling
-            if 'OB Analysis' in wb.sheetnames:
-                ws_ob = wb['OB Analysis']
-                style_data_sheet(ws_ob, 'OVERBURDEN (OB) ANALYSIS', 3, 4, 6,
-                                 status_col_idx=6, freeze_cell='A4',
-                                 num_fmt_cols=[2,3,4], pct_fmt_cols=[5])
-
-            if 'CH Analysis' in wb.sheetnames:
-                ws_ch = wb['CH Analysis']
-                style_data_sheet(ws_ch, 'COAL HAULING (CH) ANALYSIS', 3, 4, ws_ch.max_column,
-                                 status_col_idx=ws_ch.max_column, freeze_cell='A4',
-                                 num_fmt_cols=[2,3,4,5,6], pct_fmt_cols=[ws_ch.max_column-1])
-
-            if 'CM Analysis' in wb.sheetnames:
-                ws_cm = wb['CM Analysis']
-                style_data_sheet(ws_cm, 'COAL MINING (CM) ANALYSIS', 3, 4, ws_cm.max_column,
-                                 status_col_idx=ws_cm.max_column, freeze_cell='A4',
-                                 num_fmt_cols=[2,3,4,5,6,7], pct_fmt_cols=[ws_cm.max_column-1])
-
-            if 'Material Flow' in wb.sheetnames:
-                ws_fl = wb['Material Flow']
-                style_data_sheet(ws_fl, 'MATERIAL FLOW ANALYSIS', 3, 4, ws_fl.max_column,
-                                 freeze_cell='A4',
-                                 num_fmt_cols=[2,3,4,5,6,7,8,11] if ws_fl.max_column >= 11 else None,
-                                 pct_fmt_cols=[9,10] if ws_fl.max_column >= 10 else None)
-
-            if 'Performance Matrix' in wb.sheetnames:
-                ws_mx = wb['Performance Matrix']
-                style_data_sheet(ws_mx, 'PERFORMANCE MATRIX', 3, 4, 6,
-                                 freeze_cell='A4', pct_fmt_cols=[6])
-
-            # Conditional formatting
-            try:
-                if 'OB Analysis' in wb.sheetnames:
-                    ws = wb['OB Analysis']
-                    ws.conditional_formatting.add(
-                        f'E4:E{ws.max_row}',
-                        ColorScaleRule(
-                            start_type='num', start_value=-5, start_color=C['red_txt'],
-                            mid_type='num', mid_value=0, mid_color='FFFFFF',
-                            end_type='num', end_value=5, end_color=C['green_txt']
-                        )
-                    )
-            except Exception:
-                pass
-
-            try:
-                if 'Material Flow' in wb.sheetnames:
-                    ws = wb['Material Flow']
-                    if ws.max_column >= 10:
-                        for cl in ['I', 'J']:
-                            ws.conditional_formatting.add(
-                                f'{cl}4:{cl}{ws.max_row}',
-                                ColorScaleRule(
-                                    start_type='num', start_value=85, start_color=C['red_txt'],
-                                    mid_type='num', mid_value=100, mid_color='FFFFFF',
-                                    end_type='num', end_value=115, end_color=C['green_txt']
-                                )
-                            )
-                    if ws.max_column >= 11:
-                        ws.conditional_formatting.add(
-                            f'K4:K{ws.max_row}',
-                            ColorScaleRule(
-                                start_type='num', start_value=-10000, start_color=C['red_txt'],
-                                mid_type='num', mid_value=0, mid_color='FFFFFF',
-                                end_type='num', end_value=10000, end_color=C['green_txt']
-                            )
-                        )
-            except Exception:
-                pass
-
-            try:
-                if 'Performance Matrix' in wb.sheetnames:
-                    ws = wb['Performance Matrix']
-                    mr = ws.max_row - 1
-                    ws.conditional_formatting.add(f'B4:B{mr}', DataBarRule(start_type='num', start_value=0, end_type='num', end_value=30, color=C['green_txt']))
-                    ws.conditional_formatting.add(f'C4:C{mr}', DataBarRule(start_type='num', start_value=0, end_type='num', end_value=30, color=C['gold_md']))
-                    ws.conditional_formatting.add(f'D4:D{mr}', DataBarRule(start_type='num', start_value=0, end_type='num', end_value=30, color=C['red_txt']))
-            except Exception:
-                pass
-
-            buf_final = io.BytesIO()
-            wb.save(buf_final)
-            buf_final.seek(0)
-
-            st.download_button(
-                label="Download Excel Report",
-                data=buf_final.getvalue(),
-                file_name=f"KPP_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key='dl_excel', use_container_width=True
-            )
-
-        # ═══════ HTML EXPORT ═══════
-        with exp2:
-            st.markdown("""
-            <div style="background:rgba(34,197,94,0.06);padding:10px 12px;border-radius:8px;
-                border-left:3px solid #22C55E;margin-bottom:8px;">
-                <div style="font-size:0.82rem;font-weight:700;color:#e5e7eb;"> HTML Report</div>
-                <div style="font-size:0.72rem;color:#94A3B8;margin-top:2px;">Interactive charts with hover/zoom</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            figs_html = [
-                make_fig1(chart_theme_st), make_fig2(chart_theme_st), make_fig3(chart_theme_st),
-                make_fig4(chart_theme_st), make_fig5(chart_theme_st), make_fig6(chart_theme_st),
-                make_fig7(chart_theme_st), make_fig8(chart_theme_st)
-            ]
-            f_divs = [f.to_html(full_html=False, include_plotlyjs=False) for f in figs_html]
-
-            ch_disp_twb = df_ch['TWB_CH'].mean() if len(df_ch) > 0 else 0
-            cm_disp_twb = df_cm_data['TWB_CM'].mean() if len(df_cm_data) > 0 else 0
-            ch_disp_wb = df_ch['CH_WB'].mean() if len(df_ch) > 0 else 0
-            cm_disp_wb = df_cm_data['CM_WB'].mean() if len(df_cm_data) > 0 else 0
-            ob_max_dev = df_ob['Dev_Relatif_Pct'].abs().max()
-            ob_tc_total = df_ob['TC'].sum()
-            ob_js_total = df_ob['JS'].sum()
-            ob_normal_n = int(matrix.iloc[0]['Normal'])
-            ob_caution_n = int(matrix.iloc[0]['Caution'])
-            ob_critical_n = int(matrix.iloc[0]['Critical'])
-
-            stats_a = [
-                ('Avg Deviation', f'{ob_disp_dev:.2f}%', '#F59E0B' if ob_disp_dev > 2 else '#22C55E'),
-                ('Max Deviation', f'{ob_max_dev:.2f}%', '#EF4444' if ob_max_dev > 3 else '#F59E0B'),
-                ('Total TC', f'{ob_tc_total:,.0f} BCM', '#60A5FA'),
-                ('Total JS', f'{ob_js_total:,.0f} BCM', '#34D399'),
-                ('Normal', str(ob_normal_n), '#22C55E'),
-                ('Caution', str(ob_caution_n), '#F59E0B'),
-                ('Critical', str(ob_critical_n), '#EF4444'),
-            ]
-            stats_b = [
-                ('CH Avg TWB', f'{ch_disp_twb:,.0f} ton', '#60A5FA'),
-                ('CH Avg WB', f'{ch_disp_wb:,.0f} ton', '#34D399'),
-                ('CH Avg Dev', f'{ch_disp_dev:.2f}%', '#F59E0B' if ch_disp_dev > 2 else '#22C55E'),
-                ('CM Avg TWB', f'{cm_disp_twb:,.0f} ton', '#60A5FA'),
-                ('CM Avg WB', f'{cm_disp_wb:,.0f} ton', '#34D399'),
-                ('CM Avg Dev', f'{cm_disp_dev:.2f}%', '#F59E0B' if cm_disp_dev > 2 else '#22C55E'),
-            ]
-            stats_c = [
-                ('CH Normal', str(int(matrix.iloc[1]['Normal'])), '#22C55E'),
-                ('CH Caution', str(int(matrix.iloc[1]['Caution'])), '#F59E0B'),
-                ('CH Critical', str(int(matrix.iloc[1]['Critical'])), '#EF4444'),
-                ('CM Normal', str(int(matrix.iloc[2]['Normal'])), '#22C55E'),
-                ('CM Caution', str(int(matrix.iloc[2]['Caution'])), '#F59E0B'),
-                ('CM Critical', str(int(matrix.iloc[2]['Critical'])), '#EF4444'),
-            ]
-            stats_d = [
-                ('Avg CM TWB', f'{disp_cm:,.0f} ton', '#60A5FA'),
-                ('Avg CH TWB', f'{disp_ch:,.0f} ton', '#34D399'),
-                ('Avg Sales', f'{disp_sales:,.0f} ton', '#A78BFA'),
-                ('CPP Dev', f'{disp_dev_cpp:,.0f} ton', '#F59E0B'),
-                ('Port Dev', f'{disp_dev_port:,.0f} ton', '#EF4444'),
-                ('CH Ratio', f'{disp_ch_ratio:.1f}%', '#34D399'),
-                ('Sales Ratio', f'{disp_sales_ratio:.1f}%', '#60A5FA'),
-            ]
-
-            html_report = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KPP AUTOMATIC Deviation Analytics Report {report_date}</title>
-<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0;min-height:100vh}}
-.rc{{max-width:1200px;margin:0 auto;padding:2rem 2.5rem}}
-.rh{{text-align:center;padding:2.5rem 2rem;margin-bottom:2rem;background:linear-gradient(135deg,#0F172A,#1E293B);border:1px solid rgba(148,163,184,0.15);border-radius:16px}}
-.rh h1{{font-size:1.8rem;font-weight:900;color:#22C55E;margin-bottom:0.3rem}}
-.rh .sub{{color:#94A3B8;font-size:0.95rem}}
-.rh .dt{{color:#64748B;font-size:0.85rem;margin-top:0.3rem}}
-.sec{{margin-bottom:2rem}}
-.sh{{display:flex;align-items:center;gap:0.8rem;padding:0.8rem 1.2rem;margin-bottom:1rem;background:linear-gradient(90deg,rgba(34,197,94,0.1),transparent);border-left:4px solid #22C55E;border-radius:0 8px 8px 0}}
-.sh h2{{font-size:1rem;font-weight:700;color:#F1F5F9}}
-.kr{{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:0.5rem}}
-.kc{{background:#1E293B;border:1px solid rgba(148,163,184,0.12);border-radius:12px;padding:1.2rem 1rem;text-align:center;position:relative;overflow:hidden}}
-.kc::before{{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ac)}}
-.kc .lb{{font-size:0.72rem;color:#64748B;text-transform:uppercase;letter-spacing:1px;font-weight:600}}
-.kc .vl{{font-size:1.6rem;font-weight:900;color:#F1F5F9;margin:0.4rem 0 0.2rem}}
-.kc .st{{font-size:0.8rem;font-weight:600}}
-.kc .dt{{font-size:0.72rem;color:#64748B;margin-top:0.3rem}}
-.cg{{display:grid;grid-template-columns:1fr 1fr;gap:1rem}}
-.cc{{background:#1E293B;border:1px solid rgba(148,163,184,0.1);border-radius:12px;padding:0.8rem;overflow:hidden}}
-.fc{{display:flex;align-items:center;justify-content:center;gap:0.5rem;padding:1.5rem 1rem;background:#1E293B;border:1px solid rgba(148,163,184,0.1);border-radius:12px;margin-bottom:1rem;flex-wrap:wrap}}
-.fn{{background:#0F172A;border:1px solid rgba(148,163,184,0.15);border-radius:10px;padding:1rem 1.5rem;text-align:center;min-width:140px}}
-.fn .fl{{font-size:0.7rem;color:#64748B;text-transform:uppercase}}
-.fn .fv{{font-size:1.3rem;font-weight:800;margin:0.3rem 0}}
-.mt{{width:100%;border-collapse:collapse;background:#1E293B;border-radius:12px;overflow:hidden;border:1px solid rgba(148,163,184,0.1)}}
-.mt th{{background:#166534;color:#fff;padding:0.7rem 1rem;font-size:0.8rem;font-weight:700;text-transform:uppercase;text-align:center}}
-.mt td{{padding:0.6rem 1rem;text-align:center;font-size:0.85rem;border-bottom:1px solid rgba(148,163,184,0.08)}}
-.mt tr:last-child td{{border-bottom:none}}
-.mt .rt{{background:rgba(34,197,94,0.08);font-weight:700}}
-.cg2{{color:#22C55E;font-weight:700}}
-.cy{{color:#F59E0B;font-weight:700}}
-.cr{{color:#EF4444;font-weight:700}}
-.rf{{text-align:center;padding:1.5rem;color:#475569;font-size:0.75rem;border-top:1px solid rgba(148,163,184,0.1);margin-top:2rem}}
-</style>
-</head>
-<body>
-<div class="rc">
-<div class="rh">
-<h1>AUTOMATIC DEVIATION ANALYTICS REPORT</h1>
-<div class="sub">PT Kalimantan Prima Persada</div>
-<div class="dt">Generated: {report_date}</div>
-</div>
-
-<div class="sec">
-<div class="sh"><h2> Executive KPI Summary</h2></div>
-<div class="kr">
-<div class="kc" style="--ac:{ob_clr}"><div class="lb">OVERBURDEN (OB)</div><div class="vl">{ob_disp_dev:.2f}%</div><div class="st" style="color:{ob_clr}">{ob_lbl2}</div><div class="dt">{int(matrix.iloc[0]['Total'])} Periods</div></div>
-<div class="kc" style="--ac:{ch_clr}"><div class="lb">COAL HAULING (CH)</div><div class="vl">{ch_disp_dev:.2f}%</div><div class="st" style="color:{ch_clr}">{ch_lbl2}</div><div class="dt">{int(matrix.iloc[1]['Total'])} Periods</div></div>
-<div class="kc" style="--ac:{cm_clr}"><div class="lb">COAL MINING (CM)</div><div class="vl">{cm_disp_dev:.2f}%</div><div class="st" style="color:{cm_clr}">{cm_lbl2}</div><div class="dt">{int(matrix.iloc[2]['Total'])} Periods</div></div>
-<div class="kc" style="--ac:{'#22C55E' if perf >= 70 else '#F59E0B' if perf >= 50 else '#EF4444'}"><div class="lb">OVERALL PERFORMANCE</div><div class="vl">{perf:.1f}%</div><div class="st" style="color:{'#22C55E' if perf >= 70 else '#F59E0B' if perf >= 50 else '#EF4444'}">{'Good' if perf >= 70 else 'Fair' if perf >= 50 else 'Poor'}</div><div class="dt">CH Ratio: {disp_ch_ratio:.1f}%</div></div>
-</div>
-</div>
-
-<div class="sec"><div class="sh"><h2>⛰️ Section A — Overburden (OB) Monthly Analysis</h2></div><div class="cg"><div class="cc">{f_divs[0]}</div><div class="cc">{f_divs[1]}</div></div><div class="fc">"""
-            for lbl, val, clr in stats_a:
-                html_report += f'<div class="fn"><div class="fl">{lbl}</div><div class="fv" style="color:{clr}">{val}</div></div>'
-            html_report += """</div></div>"""
-
-            html_report += f"""<div class="sec"><div class="sh"><h2>🚛 Section B — Coal Hauling (CH) & Coal Mining (CM)</h2></div><div class="cg"><div class="cc">{f_divs[2]}</div><div class="cc">{f_divs[3]}</div></div><div class="fc">"""
-            for lbl, val, clr in stats_b:
-                html_report += f'<div class="fn"><div class="fl">{lbl}</div><div class="fv" style="color:{clr}">{val}</div></div>'
-            html_report += """</div></div>"""
-
-            html_report += f"""<div class="sec"><div class="sh"><h2>📈 Section C — Deviation Pattern Analysis</h2></div><div class="cg"><div class="cc">{f_divs[4]}</div><div class="cc">{f_divs[5]}</div></div><div class="fc">"""
-            for lbl, val, clr in stats_c:
-                html_report += f'<div class="fn"><div class="fl">{lbl}</div><div class="fv" style="color:{clr}">{val}</div></div>'
-            html_report += """</div></div>"""
-
-            html_report += f"""<div class="sec"><div class="sh"><h2>🔄 Section D — Material Throughput & Flow Ratio</h2></div><div class="cg"><div class="cc">{f_divs[6]}</div><div class="cc">{f_divs[7]}</div></div><div class="fc">"""
-            for lbl, val, clr in stats_d:
-                html_report += f'<div class="fn"><div class="fl">{lbl}</div><div class="fv" style="color:{clr}">{val}</div></div>'
-            html_report += """</div></div>"""
-
-            html_report += f"""
-<div class="sec">
-<div class="sh"><h2>📋 Performance Matrix</h2></div>
-<table class="mt">
-<thead><tr><th>Stage</th><th>Avg |Dev%|</th><th>Normal</th><th>Caution</th><th>Critical</th><th>Total</th><th>Performance</th></tr></thead>
-<tbody>
-<tr><td><strong>Overburden (OB)</strong></td><td>{ob_disp_dev:.2f}%</td><td class="cg2">{int(matrix.iloc[0]['Normal'])}</td><td class="cy">{int(matrix.iloc[0]['Caution'])}</td><td class="cr">{int(matrix.iloc[0]['Critical'])}</td><td>{int(matrix.iloc[0]['Total'])}</td><td>{int(matrix.iloc[0]['Normal'])/max(int(matrix.iloc[0]['Total']),1)*100:.0f}%</td></tr>
-<tr><td><strong>Coal Hauling (CH)</strong></td><td>{ch_disp_dev:.2f}%</td><td class="cg2">{int(matrix.iloc[1]['Normal'])}</td><td class="cy">{int(matrix.iloc[1]['Caution'])}</td><td class="cr">{int(matrix.iloc[1]['Critical'])}</td><td>{int(matrix.iloc[1]['Total'])}</td><td>{int(matrix.iloc[1]['Normal'])/max(int(matrix.iloc[1]['Total']),1)*100:.0f}%</td></tr>
-<tr><td><strong>Coal Mining (CM)</strong></td><td>{cm_disp_dev:.2f}%</td><td class="cg2">{int(matrix.iloc[2]['Normal'])}</td><td class="cy">{int(matrix.iloc[2]['Caution'])}</td><td class="cr">{int(matrix.iloc[2]['Critical'])}</td><td>{int(matrix.iloc[2]['Total'])}</td><td>{int(matrix.iloc[2]['Normal'])/max(int(matrix.iloc[2]['Total']),1)*100:.0f}%</td></tr>
-<tr class="rt"><td><strong>OVERALL</strong></td><td></td><td class="cg2"><strong>{total_normal}</strong></td><td class="cy"><strong>{total_caution}</strong></td><td class="cr"><strong>{total_critical}</strong></td><td><strong>{total_all}</strong></td><td><strong>{perf:.1f}%</strong></td></tr>
-</tbody></table>
-</div>
-
-<div class="rf">PT Kalimantan Prima Persada — Mining Volume Deviation Monitoring System<br>Report generated: {report_date}</div>
-</div>
-</body></html>"""
-
-            html_bytes = html_report.encode('utf-8')
-            st.download_button(
-                label="Download HTML",
-                data=html_bytes,
-                file_name=f"KPP_Visual_Report_{datetime.now().strftime('%Y%m%d')}.html",
-                mime="text/html",
-                key='dl_html',
-                use_container_width=True
-            )
-
-        # ═══════ PNG EXPORT ═══════
         with exp3:
             st.markdown("""
             <div style="background:rgba(22,101,52,0.08);padding:10px 12px;border-radius:8px;
                 border-left:3px solid #16A34A;margin-bottom:8px;">
                 <div style="font-size:0.82rem;font-weight:700;color:#e5e7eb;"> PNG Report</div>
                 <div style="font-size:0.72rem;color:#94A3B8;margin-top:2px;">
-                    High-resolution visual report • KPP branding</div>
+                    One-page executive summary • larger typography • focused charts</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -3900,238 +3000,242 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0;min-height:1
                 kaleido_ok = True
             except ImportError:
                 kaleido_ok = False
-                st.warning("Library 'kaleido' tidak terinstall.")
+                st.warning("Library 'kaleido' tidak terinstall. Tambahkan kaleido==0.2.1 ke requirements.txt")
 
             if kaleido_ok:
-                if st.button(" Generate PNG", key='gen_png', use_container_width=True):
-                    with st.spinner("Generating PNG report..."):
+                if st.button(" Generate PNG", key="gen_png", use_container_width=True):
+                    with st.spinner("Generating executive PNG report..."):
                         try:
                             from PIL import Image as PILImage
                             from PIL import ImageDraw, ImageFont
 
-                            KPP_GREEN     = (22, 101, 52)
-                            KPP_LIGHT     = (34, 197, 94)
-                            KPP_DARK      = (15, 70, 38)
-                            KPP_SUBTLE    = (18, 32, 25)
-                            BGCOLOR       = (13, 20, 33)
-                            CARDBG        = (24, 35, 50)
-                            CARD_ALT      = (19, 28, 42)
-                            BLUE          = (59, 130, 246)
-                            WHITE         = (241, 245, 249)
-                            TEXTMAIN      = (226, 232, 240)
-                            GRAY          = (148, 163, 184)
-                            DARKGRAY      = (100, 116, 139)
-                            YELLOW        = (245, 158, 11)
-                            RED           = (239, 68, 68)
-                            BORDER        = (35, 48, 65)
-                            SEPARATOR     = (40, 55, 72)
-                            PURPLE        = (167, 139, 250)
+                            # ===== FIGURES =====
+                            png_theme = dict(
+                                font=dict(family="Inter, Arial, sans-serif", color="#E2E8F0", size=12),
+                                plot_bgcolor="#182332",
+                                paper_bgcolor="#182332",
+                                margin=dict(l=55, r=35, t=70, b=50),
+                                hovermode="x unified"
+                            )
 
-                            W = 2400
-                            PAD = 48
-                            INNER = 32
-                            CW = (W - 2*PAD - INNER) // 2
-                            CH = 520
-                            GAP = 24
-                            CGAP = 16
-                            HH = 160
-                            SH = 52
-                            KH = 150
-                            STH = 70
-                            FH = 70
-                            MRH = 46
-                            TH = (HH + GAP + SH + KH + GAP
-                                  + (SH + CH + STH + GAP) * 4
-                                  + SH + MRH * 5 + GAP + FH
-                                  + PAD * 2 + 120)
+                            fig_stage_png = make_fig_stage_summary(png_theme)
+                            fig_dev_png = make_fig_dev_timeline(png_theme)
+                            fig_flow_png = make_fig_latest_flow(png_theme)
 
-                            canvas = PILImage.new('RGB', (W, TH), BGCOLOR)
+                            # ===== COLORS =====
+                            BGCOLOR = (13, 20, 33)
+                            PANEL = (22, 34, 53)
+                            PANEL_ALT = (18, 29, 45)
+                            BORDER = (44, 60, 85)
+                            WHITE = (241, 245, 249)
+                            TEXT = (226, 232, 240)
+                            MUTED = (148, 163, 184)
+                            DARK = (100, 116, 139)
+                            GREEN = (34, 197, 94)
+                            BLUE = (96, 165, 250)
+                            PURPLE = (167, 139, 250)
+                            YELLOW = (245, 158, 11)
+                            RED = (239, 68, 68)
+
+                            W = 2200
+                            PAD = 42
+                            GAP = 18
+                            COL_GAP = 18
+                            HEADER_H = 130
+                            KPI_H = 150
+                            INFO_H = 330
+                            CHART_H = 430
+                            FOOT_H = 70
+                            CONTENT_W = W - PAD * 2
+
+                            H = PAD + HEADER_H + GAP + KPI_H + GAP + INFO_H + GAP + CHART_H + GAP + CHART_H + GAP + FOOT_H + PAD
+                            canvas = PILImage.new("RGB", (W, H), BGCOLOR)
                             draw = ImageDraw.Draw(canvas)
 
                             try:
-                                ft = ImageFont.truetype("arial.ttf", 38)
-                                fs = ImageFont.truetype("arial.ttf", 17)
-                                fsc = ImageFont.truetype("arial.ttf", 18)
-                                fkv = ImageFont.truetype("arial.ttf", 38)
-                                fkl = ImageFont.truetype("arial.ttf", 12)
-                                fks = ImageFont.truetype("arial.ttf", 14)
-                                fsm = ImageFont.truetype("arial.ttf", 14)
-                                fpv = ImageFont.truetype("arial.ttf", 22)
-                                fpl = ImageFont.truetype("arial.ttf", 11)
-                                ffo = ImageFont.truetype("arial.ttf", 13)
-                                fmx = ImageFont.truetype("arial.ttf", 17)
-                                fmh = ImageFont.truetype("arial.ttf", 15)
-                                flg = ImageFont.truetype("arial.ttf", 13)
+                                font_title = ImageFont.truetype("arial.ttf", 44)
+                                font_sub = ImageFont.truetype("arial.ttf", 20)
+                                font_h2 = ImageFont.truetype("arial.ttf", 24)
+                                font_body = ImageFont.truetype("arial.ttf", 18)
+                                font_small = ImageFont.truetype("arial.ttf", 14)
+                                font_kpi_value = ImageFont.truetype("arial.ttf", 34)
+                                font_kpi_label = ImageFont.truetype("arial.ttf", 15)
+                                font_kpi_status = ImageFont.truetype("arial.ttf", 18)
+                                font_table_head = ImageFont.truetype("arial.ttf", 15)
+                                font_table_cell = ImageFont.truetype("arial.ttf", 16)
                             except Exception:
-                                ft = ImageFont.load_default()
-                                fs = fsc = fkv = fkl = fks = ft
-                                fsm = fpv = fpl = ffo = fmx = ft
-                                fmh = flg = ft
+                                font_title = ImageFont.load_default()
+                                font_sub = font_h2 = font_body = font_small = font_title
+                                font_kpi_value = font_kpi_label = font_kpi_status = font_title
+                                font_table_head = font_table_cell = font_title
 
+                            def rounded_box(x, y, w, h, fill, outline=BORDER, radius=18, width=1):
+                                draw.rounded_rectangle([x, y, x+w, y+h], radius=radius, fill=fill, outline=outline, width=width)
+
+                            def draw_multiline(text, x, y, max_width, font, fill, line_gap=6):
+                                lines = []
+                                words = str(text).split()
+                                current = ""
+                                for word in words:
+                                    test = word if not current else current + " " + word
+                                    bbox = draw.textbbox((0, 0), test, font=font)
+                                    if bbox[2] - bbox[0] <= max_width:
+                                        current = test
+                                    else:
+                                        if current:
+                                            lines.append(current)
+                                        current = word
+                                if current:
+                                    lines.append(current)
+
+                                cy = y
+                                for line in lines:
+                                    draw.text((x, cy), line, font=font, fill=fill)
+                                    bbox = draw.textbbox((0, 0), line, font=font)
+                                    cy += (bbox[3] - bbox[1]) + line_gap
+                                return cy
+
+                            def fig_to_img(fig, width_px, height_px):
+                                fig.update_layout(width=width_px, height=height_px)
+                                raw = fig.to_image(format="png", engine="kaleido", scale=2)
+                                img = PILImage.open(io.BytesIO(raw)).convert("RGB")
+                                return img.resize((width_px, height_px), PILImage.LANCZOS)
+
+                            def kpi_card(x, y, w, h, label, value, status, note, accent_hex):
+                                rounded_box(x, y, w, h, PANEL)
+                                accent = tuple(int(accent_hex.strip("#")[i:i+2], 16) for i in (0, 2, 4))
+                                draw.rounded_rectangle([x+12, y, x+w-12, y+5], radius=3, fill=accent)
+                                draw.text((x+18, y+18), label.upper(), font=font_kpi_label, fill=MUTED)
+                                draw.text((x+18, y+52), value, font=font_kpi_value, fill=WHITE)
+                                draw.text((x+18, y+98), status, font=font_kpi_status, fill=accent)
+                                draw.text((x+18, y+123), note, font=font_small, fill=DARK)
+
+                            def status_fill(status):
+                                if status == "Critical":
+                                    return RED, (80, 24, 28)
+                                if status == "Caution":
+                                    return YELLOW, (85, 55, 18)
+                                return GREEN, (20, 60, 35)
+
+                            # ===== HEADER =====
                             y = PAD
+                            rounded_box(PAD, y, CONTENT_W, HEADER_H, PANEL)
+                            draw.text((PAD + 28, y + 24), "Executive Deviation & Reconciliation Report", font=font_title, fill=WHITE)
+                            draw.text((PAD + 28, y + 78), "PT Kalimantan Prima Persada", font=font_sub, fill=GREEN)
+                            draw.text((W - PAD - 320, y + 32), f"Generated: {report_date}", font=font_sub, fill=MUTED)
+                            draw.text((W - PAD - 320, y + 68), f"Latest snapshot: {latest_period_label}", font=font_sub, fill=MUTED)
 
-                            draw.rounded_rectangle([PAD, y, W-PAD, y+HH], radius=14, fill=CARDBG, outline=BORDER)
-                            for gx in range(PAD+1, W-PAD-1):
-                                t = (gx - PAD) / (W - 2*PAD)
-                                rc = int(22 + t * 12)
-                                gc = int(101 - t * 31)
-                                bc = 52
-                                draw.line([(gx, y), (gx, y+4)], fill=(rc, gc, bc))
+                            # ===== KPI ROW =====
+                            y += HEADER_H + GAP
+                            kpi_w = (CONTENT_W - 3 * GAP) // 4
 
-                            logo_ok = False
-                            try:
-                                lr = PILImage.open(LOGO_PATH).convert("RGBA")
-                                ow, oh = lr.size
-                                mlh = HH - 50
-                                sc = min(mlh / oh, mlh / ow)
-                                nw = int(ow * sc)
-                                nh = int(oh * sc)
-                                lr = lr.resize((nw, nh), PILImage.LANCZOS)
-                                lx = PAD + 30
-                                ly = y + (HH - nh) // 2
-                                canvas.paste(lr, (lx, ly), lr)
-                                tx = lx + nw + 28
-                                logo_ok = True
-                            except Exception:
-                                tx = PAD + 40
+                            kpi_card(PAD + 0 * (kpi_w + GAP), y, kpi_w, KPI_H, "Overburden (OB)", f"{ob_disp_dev:.2f}%", ob_lbl2, f'{stage_meta["OB"]["critical"]} critical · {stage_meta["OB"]["total"]} periods', ob_clr)
+                            kpi_card(PAD + 1 * (kpi_w + GAP), y, kpi_w, KPI_H, "Coal Hauling (CH)", f"{ch_disp_dev:.2f}%", ch_lbl2, f'{stage_meta["CH"]["critical"]} critical · {stage_meta["CH"]["total"]} periods', ch_clr)
+                            kpi_card(PAD + 2 * (kpi_w + GAP), y, kpi_w, KPI_H, "Coal Mining (CM)", f"{cm_disp_dev:.2f}%", cm_lbl2, f'{stage_meta["CM"]["critical"]} critical · {stage_meta["CM"]["total"]} periods', cm_clr)
+                            perf_accent = "#22C55E" if perf >= 70 else "#F59E0B" if perf >= 50 else "#EF4444"
+                            perf_status = "Good" if perf >= 70 else "Fair" if perf >= 50 else "Poor"
+                            kpi_card(PAD + 3 * (kpi_w + GAP), y, kpi_w, KPI_H, "Overall Performance", f"{perf:.1f}%", perf_status, f"CH Ratio {disp_ch_ratio:.1f}% · Sales Ratio {disp_sales_ratio:.1f}%", perf_accent)
 
-                            anc = 'lm' if logo_ok else 'mm'
-                            txp = tx if logo_ok else W // 2
-                            draw.text((txp, y + 42), "AUTOMATIC DEVIATION ANALYTICS REPORT", fill=KPP_LIGHT, font=ft, anchor=anc)
-                            draw.text((txp, y + 82), "PT Kalimantan Prima Persada — TWB Dashboard", fill=GRAY, font=fs, anchor=anc)
-                            draw.text((txp, y + 108), f"Generated: {report_date}", fill=DARKGRAY, font=fsm, anchor=anc)
-                            y += HH + GAP
+                            # ===== FINDINGS + ALERTS =====
+                            y += KPI_H + GAP
+                            left_w = int(CONTENT_W * 0.52)
+                            right_w = CONTENT_W - left_w - GAP
 
-                            def sec_hdr(cy, txt):
-                                draw.rounded_rectangle([PAD, cy, W-PAD, cy+SH], radius=10, fill=KPP_SUBTLE)
-                                draw.rounded_rectangle([PAD, cy+6, PAD+5, cy+SH-6], radius=2, fill=KPP_LIGHT)
-                                draw.text((PAD+24, cy + SH//2), txt, fill=WHITE, font=fsc, anchor='lm')
-                                return cy + SH + 8
+                            rounded_box(PAD, y, left_w, INFO_H, PANEL)
+                            rounded_box(PAD + left_w + GAP, y, right_w, INFO_H, PANEL)
 
-                            def stat_pill(sx, sy, sw, sh, sl, sv, sc):
-                                hc = sc.lstrip('#')
-                                rgb = tuple(int(hc[j:j+2], 16) for j in (0,2,4))
-                                bg = (rgb[0]//10+13, rgb[1]//10+18, rgb[2]//10+30)
-                                draw.rounded_rectangle([sx, sy, sx+sw, sy+sh], radius=8, fill=bg, outline=BORDER)
-                                draw.text((sx+sw//2, sy+14), sv, fill=rgb, font=fpv, anchor='mm')
-                                draw.text((sx+sw//2, sy+40), sl, fill=DARKGRAY, font=fpl, anchor='mm')
+                            draw.text((PAD + 20, y + 18), "Key Findings", font=font_h2, fill=WHITE)
+                            fy = y + 62
+                            for item in key_findings:
+                                draw.ellipse((PAD + 22, fy + 5, PAD + 32, fy + 15), fill=GREEN)
+                                fy = draw_multiline(item, PAD + 42, fy, left_w - 70, font_body, TEXT, line_gap=5) + 14
 
-                            kpi = [
-                                ("OVERBURDEN (OB)", f"{ob_disp_dev:.2f}%", ob_lbl2, ob_clr, f"{int(matrix.iloc[0]['Total'])} Periods"),
-                                ("COAL HAULING (CH)", f"{ch_disp_dev:.2f}%", ch_lbl2, ch_clr, f"{int(matrix.iloc[1]['Total'])} Periods"),
-                                ("COAL MINING (CM)", f"{cm_disp_dev:.2f}%", cm_lbl2, cm_clr, f"{int(matrix.iloc[2]['Total'])} Periods"),
-                                ("OVERALL PERFORMANCE", f"{perf:.1f}%", "Good" if perf >= 70 else "Fair" if perf >= 50 else "Poor",
-                                 '#22C55E' if perf >= 70 else '#F59E0B' if perf >= 50 else '#EF4444',
-                                 f"CH Ratio: {disp_ch_ratio:.1f}%"),
-                            ]
+                            draw.text((PAD + left_w + GAP + 20, y + 18), "Top Critical / Caution Periods", font=font_h2, fill=WHITE)
 
-                            y = sec_hdr(y, "EXECUTIVE KPI SUMMARY")
-                            kw = (W - 2*PAD - 3*CGAP) // 4
-                            for i, (lb, vl, st_txt, cl, dt) in enumerate(kpi):
-                                kx = PAD + i*(kw + CGAP)
-                                draw.rounded_rectangle([kx, y, kx+kw, y+KH], radius=12, fill=CARDBG, outline=BORDER)
-                                hx = cl.lstrip('#')
-                                ac = tuple(int(hx[j:j+2], 16) for j in (0,2,4))
-                                draw.rounded_rectangle([kx+12, y, kx+kw-12, y+4], radius=2, fill=ac)
-                                draw.text((kx+kw//2, y+26), lb, fill=DARKGRAY, font=fkl, anchor='mm')
-                                draw.text((kx+kw//2, y+68), vl, fill=WHITE, font=fkv, anchor='mm')
-                                bw = len(st_txt)*9 + 24
-                                bx = kx + (kw - bw)//2
-                                bbg = (ac[0]//5+13, ac[1]//5+18, ac[2]//5+28)
-                                draw.rounded_rectangle([bx, y+92, bx+bw, y+112], radius=10, fill=bbg, outline=ac)
-                                draw.text((kx+kw//2, y+102), st_txt, fill=ac, font=fks, anchor='mm')
-                                draw.text((kx+kw//2, y+132), dt, fill=DARKGRAY, font=fkl, anchor='mm')
-                            y += KH + GAP
+                            tx = PAD + left_w + GAP + 20
+                            ty = y + 58
+                            headers = [("Stage", 90), ("Period", 150), ("Dev", 100), ("Status", 110), ("Metric", right_w - 20 - 90 - 150 - 100 - 110 - 30)]
+                            cx = tx
+                            for head, width in headers:
+                                draw.text((cx, ty), head.upper(), font=font_table_head, fill=MUTED)
+                                cx += width
+                            ty += 28
 
-                            ctp = dict(
-                                font=dict(family='Inter, Arial, sans-serif', color='#E2E8F0', size=12),
-                                plot_bgcolor='#182332',
-                                paper_bgcolor='#182332',
-                                margin=dict(l=65, r=40, t=70, b=50),
-                                hovermode='x unified'
-                            )
-                            fp = [make_fig1(ctp), make_fig2(ctp), make_fig3(ctp), make_fig4(ctp),
-                                  make_fig5(ctp), make_fig6(ctp), make_fig7(ctp), make_fig8(ctp)]
-                            for fi in [6, 7]:
-                                fp[fi].update_layout(showlegend=False, margin=dict(l=65, r=40, t=70, b=50))
+                            if top_alerts.empty:
+                                draw.text((tx, ty + 16), "No critical / caution periods found.", font=font_body, fill=MUTED)
+                            else:
+                                for _, r in top_alerts.head(6).iterrows():
+                                    draw.line((tx, ty - 6, PAD + left_w + GAP + right_w - 20, ty - 6), fill=BORDER, width=1)
+                                    cx = tx
+                                    row_vals = [
+                                        str(r["Stage"]),
+                                        str(r["Period"]),
+                                        str(r["DeviationLabel"]),
+                                        str(r["Status"]),
+                                        str(r["Metric"]),
+                                    ]
+                                    for idx, ((_, width), val) in enumerate(zip(headers, row_vals)):
+                                        fill_color = TEXT
+                                        if idx == 2:
+                                            fill_color = RED if r["Status"] == "Critical" else YELLOW
+                                        draw.text((cx, ty), val, font=font_table_cell, fill=fill_color)
+                                        cx += width
+                                    ty += 34
 
-                            secs = [
-                                ("OVERBURDEN (OB) MONTHLY ANALYSIS", [0, 1], stats_a),
-                                ("COAL HAULING (CH) & COAL MINING (CM)", [2, 3], stats_b),
-                                ("DEVIATION PATTERN ANALYSIS", [4, 5], stats_c),
-                                ("MATERIAL FLOW ANALYSIS", [6, 7], stats_d),
-                            ]
+                            # ===== CHART ROW 1 =====
+                            y += INFO_H + GAP
+                            chart_w = (CONTENT_W - GAP) // 2
+                            chart_stage = fig_to_img(fig_stage_png, chart_w, CHART_H)
+                            chart_flow = fig_to_img(fig_flow_png, chart_w, CHART_H)
 
-                            for stitle, fidx, sstats in secs:
-                                y = sec_hdr(y, stitle)
+                            rounded_box(PAD, y, chart_w, CHART_H, PANEL_ALT)
+                            rounded_box(PAD + chart_w + GAP, y, chart_w, CHART_H, PANEL_ALT)
+                            canvas.paste(chart_stage, (PAD, y))
+                            canvas.paste(chart_flow, (PAD + chart_w + GAP, y))
 
-                                for ci, fi in enumerate(fidx):
-                                    fig = fp[fi]
-                                    fig.update_layout(width=CW, height=CH)
-                                    ib = fig.to_image(format='png', scale=2, engine='kaleido')
-                                    ci_img = PILImage.open(io.BytesIO(ib))
-                                    ci_img = ci_img.resize((CW, CH), PILImage.LANCZOS)
-                                    cx = PAD + ci*(CW + INNER)
-                                    draw.rounded_rectangle([cx-2, y-2, cx+CW+2, y+CH+2], radius=14, fill=BORDER)
-                                    draw.rounded_rectangle([cx, y, cx+CW, y+CH], radius=12, fill=CARDBG)
-                                    canvas.paste(ci_img, (cx, y))
-                                y += CH + 10
+                            # ===== CHART ROW 2 =====
+                            y += CHART_H + GAP
+                            chart_dev = fig_to_img(fig_dev_png, CONTENT_W, CHART_H)
+                            rounded_box(PAD, y, CONTENT_W, CHART_H, PANEL_ALT)
+                            canvas.paste(chart_dev, (PAD, y))
 
-                                ns = len(sstats)
-                                pg = 10
-                                pw = (W - 2*PAD - (ns-1)*pg) // ns
-                                for si, (sl, sv, sc) in enumerate(sstats):
-                                    sx = PAD + si*(pw + pg)
-                                    stat_pill(sx, y, pw, STH-8, sl, sv, sc)
-                                y += STH + GAP
+                            # ===== FOOTER SNAPSHOT =====
+                            y += CHART_H + GAP
+                            rounded_box(PAD, y, CONTENT_W, FOOT_H, PANEL)
+                            snapshot_items = []
+                            if latest_flow is not None:
+                                snapshot_items = [
+                                    ("CM TWB", f'{float(latest_flow["CM TWB"]):,.0f}'),
+                                    ("CH TWB", f'{float(latest_flow["CH TWB"]):,.0f}'),
+                                    ("Sales", f'{float(latest_flow["Sales"]):,.0f}'),
+                                    ("Δ CPP", f'{float(latest_flow["Delta CPP Stock"]):,.0f}'),
+                                    ("Δ Port", f'{float(latest_flow["Delta Port Stock"]):,.0f}'),
+                                    ("Dev CPP", f'{float(latest_flow["Deviation CPP"]):,.0f}'),
+                                    ("Dev Port", f'{float(latest_flow["Deviation Port"]):,.0f}'),
+                                    ("CH Ratio", f'{float(latest_flow["CH Flow Ratio (%)"]):.1f}%'),
+                                    ("Sales Ratio", f'{float(latest_flow["Sales Flow Ratio (%)"]):.1f}%'),
+                                ]
+                            else:
+                                snapshot_items = [("Snapshot", "No data")]
 
-                            y = sec_hdr(y, "PERFORMANCE MATRIX")
-                            cols = ['Stage', 'Avg Dev(%)', 'Normal', 'Caution', 'Critical', 'Total', 'Performance']
-                            cw2 = (W - 2*PAD) // len(cols)
+                            slot_w = CONTENT_W / len(snapshot_items)
+                            for i, (lb, vl) in enumerate(snapshot_items):
+                                sx = int(PAD + i * slot_w + 10)
+                                draw.text((sx, y + 12), lb.upper(), font=font_small, fill=MUTED)
+                                draw.text((sx, y + 34), vl, font=font_body, fill=WHITE)
 
-                            draw.rounded_rectangle([PAD, y, W-PAD, y+MRH], radius=8, fill=KPP_GREEN)
-                            for ci, ct in enumerate(cols):
-                                draw.text((PAD + ci*cw2 + cw2//2, y + MRH//2), ct, fill=WHITE, font=fmh, anchor='mm')
-                            y += MRH
-
-                            rows = [
-                                ('Overburden (OB)', f'{ob_disp_dev:.2f}%', str(int(matrix.iloc[0]['Normal'])), str(int(matrix.iloc[0]['Caution'])), str(int(matrix.iloc[0]['Critical'])), str(int(matrix.iloc[0]['Total'])), f'{int(matrix.iloc[0]["Normal"])/max(int(matrix.iloc[0]["Total"]),1)*100:.0f}%'),
-                                ('Coal Hauling (CH)', f'{ch_disp_dev:.2f}%', str(int(matrix.iloc[1]['Normal'])), str(int(matrix.iloc[1]['Caution'])), str(int(matrix.iloc[1]['Critical'])), str(int(matrix.iloc[1]['Total'])), f'{int(matrix.iloc[1]["Normal"])/max(int(matrix.iloc[1]["Total"]),1)*100:.0f}%'),
-                                ('Coal Mining (CM)', f'{cm_disp_dev:.2f}%', str(int(matrix.iloc[2]['Normal'])), str(int(matrix.iloc[2]['Caution'])), str(int(matrix.iloc[2]['Critical'])), str(int(matrix.iloc[2]['Total'])), f'{int(matrix.iloc[2]["Normal"])/max(int(matrix.iloc[2]["Total"]),1)*100:.0f}%'),
-                            ]
-                            cc = [TEXTMAIN, YELLOW, KPP_LIGHT, YELLOW, RED, GRAY, BLUE]
-                            for ri, rd in enumerate(rows):
-                                rbg = CARDBG if ri % 2 == 0 else CARD_ALT
-                                draw.rectangle([PAD, y, W-PAD, y+MRH], fill=rbg, outline=BORDER)
-                                for ci, v in enumerate(rd):
-                                    draw.text((PAD + ci*cw2 + cw2//2, y + MRH//2), v, fill=cc[ci], font=fmx, anchor='mm')
-                                y += MRH
-
-                            draw.rounded_rectangle([PAD, y, W-PAD, y+MRH], radius=0, fill=KPP_SUBTLE, outline=BORDER)
-                            ov = ['OVERALL', '—', str(total_normal), str(total_caution), str(total_critical), str(total_all), f'{perf:.1f}%']
-                            oc = [KPP_LIGHT, DARKGRAY, KPP_LIGHT, YELLOW, RED, TEXTMAIN, BLUE]
-                            for ci, v in enumerate(ov):
-                                draw.text((PAD + ci*cw2 + cw2//2, y + MRH//2), v, fill=oc[ci], font=fmx, anchor='mm')
-                            y += MRH + GAP
-
-                            draw.line([(PAD+60, y+8), (W-PAD-60, y+8)], fill=SEPARATOR, width=1)
-                            draw.text((W//2, y + 32), "PT Kalimantan Prima Persada — Automatic Deviation Dashboard System", fill=DARKGRAY, font=ffo, anchor='mm')
-                            draw.text((W//2, y + 52), f"Generated: {report_date}", fill=(70, 82, 100), font=ffo, anchor='mm')
-                            y += FH
-
-                            canvas = canvas.crop((0, 0, W, y + PAD))
                             buf = io.BytesIO()
-                            canvas.save(buf, format='PNG', quality=95, optimize=True)
+                            canvas.save(buf, format="PNG", quality=95, optimize=True)
                             buf.seek(0)
 
                             st.success(f"✅ PNG generated — {canvas.size[0]}×{canvas.size[1]}px")
-                            st.image(canvas, caption="Preview — Full Resolution", use_container_width=True)
+                            st.image(canvas, caption="Preview — Executive PNG Report", use_container_width=True)
                             st.download_button(
                                 label=" Download PNG Report",
                                 data=buf.getvalue(),
-                                file_name=f"KPP_Report_{datetime.now().strftime('%Y%m%d')}.png",
+                                file_name=f"KPP_Executive_Report_{datetime.now().strftime('%Y%m%d')}.png",
                                 mime="image/png",
-                                key='dl_png',
+                                key="dl_png",
                                 use_container_width=True
                             )
 

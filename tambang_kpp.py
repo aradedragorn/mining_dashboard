@@ -34,6 +34,7 @@ DEMO_DATA_DIR = BASE_DIR / "demo_data"
 def get_available_demo_files():
     if not DEMO_DATA_DIR.exists():
         return {}
+
     excel_files = sorted(DEMO_DATA_DIR.glob("*.xlsx"))
     return {file.stem: file for file in excel_files}
 
@@ -60,26 +61,35 @@ def get_base64_image(image_path, size=(120, 120)):  # Diperbesar dari 60 ke 120
         return None
 
 # Fungsi untuk menampilkan logo dengan berbagai metode
-def display_logo(logo_path, width=120):  # Diperbesar dari 60 ke 120
+def display_logo(logo_path, width=120):
     try:
-        # Coba tampilkan langsung menggunakan PIL Image
-        if os.path.exists(logo_path):
+        logo_path = Path(logo_path)
+        if logo_path.exists():
             img = Image.open(logo_path)
-            # Resize gambar
             img = img.resize((width, width), Image.Resampling.LANCZOS)
             return img
         else:
-            # Fallback ke placeholder
             from PIL import ImageDraw, ImageFont
             img = Image.new('RGB', (width, width), color=(0, 40, 80))
             d = ImageDraw.Draw(img)
-            # Coba buat teks KPP di tengah
             try:
-                font = ImageFont.truetype("arial.ttf", 40)  # Diperbesar font
-            except:
+                font = ImageFont.truetype("arial.ttf", 40)
+            except Exception:
                 font = ImageFont.load_default()
-            d.text((width//2-40, width//2-20), "KPP", fill=(0, 100, 136), font=font)
+            d.text((width // 2 - 40, width // 2 - 20), "KPP", fill=(0, 100, 136), font=font)
             return img
+    except Exception as e:
+        st.error(f"Error loading logo: {e}")
+        from PIL import ImageDraw, ImageFont
+        img = Image.new('RGB', (width, width), color=(0, 40, 80))
+        d = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("arial.ttf", 40)
+        except Exception:
+            font = ImageFont.load_default()
+        d.text((width // 2 - 40, width // 2 - 20), "KPP", fill=(0, 255, 136), font=font)
+        return img
+        
     except Exception as e:
         st.error(f"Error loading logo: {e}")
         # Return placeholder
@@ -734,8 +744,6 @@ def format_large(num):
     elif abs(num) >= 1e3: 
         return f"{num/1e3:.1f}K"
     return f"{num:.0f}"
-def get_available_demo_files():
-    return {name: path for name, path in DEMO_FILES.items() if path.exists()}
 
 def get_active_data_source():
     available_demo_files = get_available_demo_files()
@@ -756,7 +764,7 @@ def get_active_data_source():
 
         if source_mode == "Pilih Data Demo":
             if not available_demo_files:
-                st.warning("Folder demo_data belum berisi file demo.")
+                st.warning("Folder demo_data belum berisi file demo (.xlsx).")
             else:
                 demo_choice = st.selectbox(
                     "Pilih data demo:",
@@ -764,9 +772,10 @@ def get_active_data_source():
                     key="demo_file_choice"
                 )
                 selected_file = available_demo_files[demo_choice]
-                selected_file_name = demo_choice
+                selected_file_name = available_demo_files[demo_choice].name
                 selected_source_type = "demo"
-                st.success(f"Demo aktif: {demo_choice}")
+                st.success(f"Demo aktif: {selected_file_name}")
+
         else:
             uploaded = st.file_uploader(
                 "Upload Excel File",

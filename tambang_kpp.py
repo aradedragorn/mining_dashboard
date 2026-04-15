@@ -1672,36 +1672,40 @@ def main():
 
 
                 vc1, vc2, vc3, vc4 = st.columns(4)
+
                 with vc1:
                     st.markdown(f"""
                     <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                     border:1px solid rgba(148,163,184,0.1);text-align:center">
-                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Avg Volume</div>
+                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Latest CM TWB</div>
                         <div style="color:#3b82f6;font-size:1.1rem;font-weight:700">{disp_cm:,.0f} t</div>
                     </div>""", unsafe_allow_html=True)
+
                 with vc2:
                     st.markdown(f"""
                     <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                     border:1px solid rgba(148,163,184,0.1);text-align:center">
-                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Peak Volume</div>
-                        <div style="color:#22c55e;font-size:1.1rem;font-weight:700">{peak_cm:,.0f} t</div>
+                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Latest CH TWB</div>
+                        <div style="color:#22c55e;font-size:1.1rem;font-weight:700">{disp_ch:,.0f} t</div>
                     </div>""", unsafe_allow_html=True)
+
                 with vc3:
-                    eff_color = '#22c55e' if disp_eff_val >= 100 else '#f59e0b' if disp_eff_val >= 90 else '#ef4444'
+                    ratio_color = '#22c55e' if disp_ch_ratio >= 100 else '#f59e0b' if disp_ch_ratio >= 90 else '#ef4444'
                     st.markdown(f"""
                     <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                     border:1px solid rgba(148,163,184,0.1);text-align:center">
-                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Avg Efficiency</div>
-                        <div style="color:{eff_color};font-size:1.1rem;font-weight:700">{disp_eff_val:.1f}%</div>
+                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">CH Flow Ratio</div>
+                        <div style="color:{ratio_color};font-size:1.1rem;font-weight:700">{disp_ch_ratio:.1f}%</div>
                     </div>""", unsafe_allow_html=True)
+
                 with vc4:
-                    bt_pct = below_target / total_p * 100 if total_p > 0 else 0
-                    bt_color = '#22c55e' if bt_pct < 30 else '#f59e0b' if bt_pct < 60 else '#ef4444'
+                    dev_total = abs(disp_dev_cpp) + abs(disp_dev_port)
+                    dev_color = '#22c55e' if dev_total < 2000 else '#f59e0b' if dev_total < 10000 else '#ef4444'
                     st.markdown(f"""
                     <div style="background:rgba(15,15,30,0.8);border-radius:10px;padding:0.8rem;
                     border:1px solid rgba(148,163,184,0.1);text-align:center">
-                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Below Target</div>
-                        <div style="color:{bt_color};font-size:1.1rem;font-weight:700">{below_target}/{total_p} ({bt_pct:.0f}%)</div>
+                        <div style="color:#9ca3af;font-size:0.7rem;margin-bottom:0.2rem">Total Deviation</div>
+                        <div style="color:{dev_color};font-size:1.1rem;font-weight:700">{dev_total:,.0f} t</div>
                     </div>""", unsafe_allow_html=True)
 
 

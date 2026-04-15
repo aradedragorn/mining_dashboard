@@ -753,7 +753,7 @@ def get_active_data_source():
 
         source_mode = st.radio(
             "Pilih sumber data:",
-            ["Pilih Data Demo", "Upload Excel"],
+            ["Pilih Data Training", "Upload Excel"],
             index=0,
             key="data_source_mode"
         )
@@ -762,12 +762,12 @@ def get_active_data_source():
         selected_file_name = None
         selected_source_type = None
 
-        if source_mode == "Pilih Data Demo":
+        if source_mode == "Pilih Data Training":
             if not available_demo_files:
                 st.warning("Folder demo_data belum berisi file demo (.xlsx).")
             else:
                 demo_choice = st.selectbox(
-                    "Pilih data demo:",
+                    "Pilih Data Training:",
                     list(available_demo_files.keys()),
                     key="demo_file_choice"
                 )
@@ -1082,7 +1082,7 @@ def main():
         """, unsafe_allow_html=True)
 
     if selected_file is None:
-        st.info("Silakan pilih data demo atau upload file Excel dari sidebar.")
+        st.info("Silakan pilih Data Training atau upload file Excel dari sidebar.")
         st.markdown("""
         <div style='margin-top:2rem;padding:2rem;background:rgba(255,255,255,0.05);border-radius:20px;border:1px solid rgba(255,255,255,0.1)'>
             <h3 style='color:#00ff88;margin-bottom:1rem'>Required Format:</h3>

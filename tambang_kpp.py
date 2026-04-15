@@ -871,56 +871,61 @@ def render_status_distribution(status_col, total_count, key_prefix=""):
 @st.cache_data
 def load_data(file):
     try:
-        # Load OB data (TIDAK BERUBAH)
-        df_ob = pd.read_excel(file, sheet_name='OB Monthly')
-        df_ob['Dev_Absolut'] = df_ob['JS'] - df_ob['TC']
-        df_ob['Dev_Relatif_Pct'] = ((df_ob['JS'] - df_ob['TC']) / df_ob['TC']) * 100
-        df_ob['Status'], df_ob['Status_Color'] = zip(*df_ob['Dev_Relatif_Pct'].apply(get_kpi_status))
+        excel_file = pd.ExcelFile(file)
+        required_sheets = ["OB Monthly", "CH CM"]
+
+        missing_sheets = [sheet for sheet in required_sheets if sheet not in excel_file.sheet_names]
+        if missing_sheets:
+            st.error(f"❌ Sheet tidak ditemukan: {', '.join(missing_sheets)}")
+            return None, None
+
+        # Load OB data
+        df_ob = pd.read_excel(file, sheet_name="OB Monthly")
+        df_ob["Dev_Absolut"] = df_ob["JS"] - df_ob["TC"]
+        df_ob["Dev_Relatif_Pct"] = ((df_ob["JS"] - df_ob["TC"]) / df_ob["TC"]) * 100
+        df_ob["Status"], df_ob["Status_Color"] = zip(*df_ob["Dev_Relatif_Pct"].apply(get_kpi_status))
 
         # Load CH/CM data
-        df_ch_cm = pd.read_excel(file, sheet_name='CH CM', skiprows=1)
-        df_ch_cm.columns = ['Date', 'Port_Darat', 'Port_Laut', 'CPP_Raw', 'CPP_Product', 'Sales', 'CH_WB', 'CM_WB']
-        df_ch_cm = df_ch_cm.dropna(subset=['Date'])
-        df_ch_cm['Date'] = pd.to_datetime(df_ch_cm['Date'])
+        df_ch_cm = pd.read_excel(file, sheet_name="CH CM", skiprows=1)
+        df_ch_cm.columns = ["Date", "Port_Darat", "Port_Laut", "CPP_Raw", "CPP_Product", "Sales", "CH_WB", "CM_WB"]
+        df_ch_cm = df_ch_cm.dropna(subset=["Date"])
+        df_ch_cm["Date"] = pd.to_datetime(df_ch_cm["Date"])
 
-        # ========== PERHITUNGAN TWB DENGAN BASELINE (BARIS PERTAMA) ==========
         # Hitung total stok Port & CPP
-        df_ch_cm['Port_Total'] = df_ch_cm['Port_Darat'] + df_ch_cm['Port_Laut']
-        df_ch_cm['CPP_Total'] = df_ch_cm['CPP_Raw'].fillna(0) + df_ch_cm['CPP_Product'].fillna(0)
-        
-        # LOCK baris pertama sebagai baseline (stok bulan lalu)
+        df_ch_cm["Port_Total"] = df_ch_cm["Port_Darat"] + df_ch_cm["Port_Laut"]
+        df_ch_cm["CPP_Total"] = df_ch_cm["CPP_Raw"].fillna(0) + df_ch_cm["CPP_Product"].fillna(0)
+
+        # Baseline dari baris pertama
         if len(df_ch_cm) > 0:
-            port_baseline = df_ch_cm["Port_Total"].iloc[0]  # Stok Port 31 Oct
-            cpp_baseline  = df_ch_cm["CPP_Total"].iloc[0]   # Stok CPP 31 Oct
-            
-            # TWB CH: Sales + PortTotal - PortBaseline (selalu pakai baris pertama)
+            port_baseline = df_ch_cm["Port_Total"].iloc[0]
+            cpp_baseline = df_ch_cm["CPP_Total"].iloc[0]
+
             df_ch_cm["TWB_CH"] = df_ch_cm["Sales"].fillna(0) + df_ch_cm["Port_Total"] - port_baseline
-            
-            # TWB CM: TWBCH + CPPTotal - CPPBaseline (selalu pakai baris pertama)
             df_ch_cm["TWB_CM"] = df_ch_cm["TWB_CH"] + df_ch_cm["CPP_Total"] - cpp_baseline
         else:
             df_ch_cm["TWB_CH"] = 0
             df_ch_cm["TWB_CM"] = 0
 
-        # Calculate deviations CH
-        df_ch_cm['Dev_CH_Absolut'] = df_ch_cm['TWB_CH'] - df_ch_cm['CH_WB']
-        df_ch_cm['Dev_CH_Relatif_Pct'] = np.where(
-            df_ch_cm['CH_WB'] != 0,
-            ((df_ch_cm['TWB_CH'] - df_ch_cm['CH_WB']) / df_ch_cm['CH_WB']) * 100,
+        # CH deviation
+        df_ch_cm["Dev_CH_Absolut"] = df_ch_cm["TWB_CH"] - df_ch_cm["CH_WB"]
+        df_ch_cm["Dev_CH_Relatif_Pct"] = np.where(
+            df_ch_cm["CH_WB"] != 0,
+            ((df_ch_cm["TWB_CH"] - df_ch_cm["CH_WB"]) / df_ch_cm["CH_WB"]) * 100,
             np.nan
         )
-        df_ch_cm['Status_CH'], df_ch_cm['Status_CH_Color'] = zip(*df_ch_cm['Dev_CH_Relatif_Pct'].apply(get_kpi_status))
+        df_ch_cm["Status_CH"], df_ch_cm["Status_CH_Color"] = zip(*df_ch_cm["Dev_CH_Relatif_Pct"].apply(get_kpi_status))
 
-        # Calculate deviations CM
-        df_ch_cm['Dev_CM_Absolut'] = df_ch_cm['TWB_CM'] - df_ch_cm['CM_WB']
-        df_ch_cm['Dev_CM_Relatif_Pct'] = np.where(
-            df_ch_cm['CM_WB'] != 0,
-            ((df_ch_cm['TWB_CM'] - df_ch_cm['CM_WB']) / df_ch_cm['CM_WB']) * 100,
+        # CM deviation
+        df_ch_cm["Dev_CM_Absolut"] = df_ch_cm["TWB_CM"] - df_ch_cm["CM_WB"]
+        df_ch_cm["Dev_CM_Relatif_Pct"] = np.where(
+            df_ch_cm["CM_WB"] != 0,
+            ((df_ch_cm["TWB_CM"] - df_ch_cm["CM_WB"]) / df_ch_cm["CM_WB"]) * 100,
             np.nan
         )
-        df_ch_cm['Status_CM'], df_ch_cm['Status_CM_Color'] = zip(*df_ch_cm['Dev_CM_Relatif_Pct'].apply(get_kpi_status))
+        df_ch_cm["Status_CM"], df_ch_cm["Status_CM_Color"] = zip(*df_ch_cm["Dev_CM_Relatif_Pct"].apply(get_kpi_status))
 
         return df_ob, df_ch_cm
+
     except Exception as e:
         st.error(f"❌ Error loading data: {str(e)}")
         return None, None
@@ -1002,11 +1007,10 @@ THEME = {
 }
 
 def main():
-    # HEADER - DENGAN LOGO DAN JUDUL SEJAJAR (BACKGROUND PUTIH)
     st.markdown('<div class="main-header">', unsafe_allow_html=True)
-    
+
     logo_base64_final = get_base64_image(LOGO_PATH, size=(100, 100))
-    
+
     if logo_base64_final:
         st.markdown(f"""
         <div class="header-container">
@@ -1015,7 +1019,7 @@ def main():
             </div>
             <div class="title-wrapper">
                 <h1 class="main-title">Mining Volume Deviation Monitoring</h1>
-                <p class="main-subtitle">PT KALIMANTAN PRIMA PERSADA </p>
+                <p class="main-subtitle">PT KALIMANTAN PRIMA PERSADA</p>
             </div>
             <div class="stats-grid">
                 <div class="stat-card">
@@ -1033,14 +1037,12 @@ def main():
             </div>
         </div>
         """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
-# SIDEBAR
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    selected_file, selected_file_name, selected_source_type = get_active_data_source()
+
     with st.sidebar:
-        st.markdown("###  DATA UPLOAD")
-        uploaded = st.file_uploader("Upload Excel File", type=['xlsx', 'xls'])
-
         st.markdown("---")
         st.markdown("### KPI REFERENCE")
         st.markdown("""
@@ -1068,24 +1070,47 @@ def main():
             <p style='font-size:0.85rem'>2026</p>
         </div>
         """, unsafe_allow_html=True)
-    if uploaded is None:
-        st.info("Please upload your Excel file from the sidebar")
+
+    if selected_file is None:
+        st.info("Silakan pilih data demo atau upload file Excel dari sidebar.")
         st.markdown("""
         <div style='margin-top:2rem;padding:2rem;background:rgba(255,255,255,0.05);border-radius:20px;border:1px solid rgba(255,255,255,0.1)'>
             <h3 style='color:#00ff88;margin-bottom:1rem'>Required Format:</h3>
             <p style='color:#d1d5db'>• Sheet 1: <strong>"OB Monthly"</strong></p>
             <p style='color:#d1d5db'>• Sheet 2: <strong>"CH CM"</strong></p>
+            <p style='color:#d1d5db'>• Atau pilih file dari folder <strong>demo_data/</strong></p>
         </div>
         """, unsafe_allow_html=True)
         return
-# LOAD DATA
-    with st.spinner(' Processing...'):
-        df_ob, df_ch_cm = load_data(uploaded)
+
+    with st.spinner("Processing data..."):
+        df_ob, df_ch_cm = load_data(selected_file)
+
     if df_ob is None or df_ch_cm is None:
-        st.error(" Failed to load data")
+        st.error("Failed to load data")
         return
-    st.success(" Data loaded!")
-# TABS
+
+    source_badge_color = "#3b82f6" if selected_source_type == "upload" else "#22c55e"
+    source_badge_label = "UPLOADED FILE" if selected_source_type == "upload" else "DEMO DATA"
+
+    st.markdown(f"""
+    <div style='margin-bottom:1rem;padding:0.8rem 1rem;background:rgba(255,255,255,0.05);
+                border:1px solid rgba(255,255,255,0.1);border-radius:12px;display:flex;
+                align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;'>
+        <div>
+            <div style='font-size:0.75rem;color:#9ca3af;'>Current Data Source</div>
+            <div style='font-size:1rem;font-weight:700;color:#ffffff;'>{selected_file_name}</div>
+        </div>
+        <div style='padding:0.35rem 0.8rem;border-radius:999px;background:{source_badge_color}20;
+                    color:{source_badge_color};border:1px solid {source_badge_color}55;
+                    font-size:0.75rem;font-weight:700;letter-spacing:0.05em;'>
+            {source_badge_label}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.success("Data loaded successfully!")
+
     tab1, tab2, tab3, tab4 = st.tabs([
         " Overview",
         " OB Analysis",

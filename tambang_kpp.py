@@ -31,11 +31,11 @@ BASE_DIR = Path(__file__).resolve().parent
 LOGO_PATH = BASE_DIR / "assets" / "logo.png"
 DEMO_DATA_DIR = BASE_DIR / "demo_data"
 
-DEMO_FILES = {
-    "Training Data Beneran": DEMO_DATA_DIR / "Training Data Beneran.xlsx",
-    # Tambahkan file demo lain jika ada
-    # "Demo Januari": DEMO_DATA_DIR / "Demo Januari.xlsx",
-}
+def get_available_demo_files():
+    if not DEMO_DATA_DIR.exists():
+        return {}
+    excel_files = sorted(DEMO_DATA_DIR.glob("*.xlsx"))
+    return {file.stem: file for file in excel_files}
 
 # Fungsi untuk mengonversi gambar ke base64 dengan resize
 def get_base64_image(image_path, size=(120, 120)):  # Diperbesar dari 60 ke 120

@@ -1086,8 +1086,8 @@ def main():
         st.markdown("""
         <div style='margin-top:2rem;padding:2rem;background:rgba(255,255,255,0.05);border-radius:20px;border:1px solid rgba(255,255,255,0.1)'>
             <h3 style='color:#00ff88;margin-bottom:1rem'>Required Format:</h3>
-            <p style='color:#d1d5db'>• Sheet 1: <strong>"OB Monthly"</strong></p>
-            <p style='color:#d1d5db'>• Sheet 2: <strong>"CH CM"</strong></p>
+            <p style='color:#d1d5db'>• Sheet 1: <strong>"OB (Overburden) Monthly"</strong></p>
+            <p style='color:#d1d5db'>• Sheet 2: <strong>"Coal Hauling &amp; Coal Mining"</strong></p>
             <p style='color:#d1d5db'>• Atau pilih file dari folder <strong>demo_data/</strong></p>
         </div>
         """, unsafe_allow_html=True)

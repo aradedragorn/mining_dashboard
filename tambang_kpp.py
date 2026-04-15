@@ -1455,7 +1455,7 @@ def main():
             </head>
             <body>
             <div class="pipeline-wrap">
-                <div class="pipeline-title">Production Flow Summary — Weekly Average</div>
+                <div class="pipeline-title">Production Flow Summary</div>
                 <div class="pipe-chain">
                     <div class="pipe-node node-cm">
                         <div class="pipe-node-label">From PIT To CPP</div>

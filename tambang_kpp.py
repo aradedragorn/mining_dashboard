@@ -1458,7 +1458,7 @@ def main():
                 <div class="pipeline-title">Production Flow Summary — Weekly Average</div>
                 <div class="pipe-chain">
                     <div class="pipe-node node-cm">
-                        <div class="pipe-node-label">From CPP33</div>
+                        <div class="pipe-node-label">To CPP33</div>
                         <div class="pipe-node-title">CM TWB</div>
                         <div class="pipe-node-value">{format_large(avg_cm)}</div>
                     </div>

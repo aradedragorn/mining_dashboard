@@ -959,7 +959,7 @@ def create_flow(df_ch_cm):
     if len(df) == 0:
         return None
 
-    # Hitung perubahan stok periodik
+    # Perubahan stok antar periode
     df["Delta CPP Stock"] = df["CPP_Total"].diff().fillna(0)
     df["Delta Port Stock"] = df["Port_Total"].diff().fillna(0)
 
@@ -972,15 +972,15 @@ def create_flow(df_ch_cm):
         delta_cpp = row["Delta CPP Stock"]
         delta_port = row["Delta Port Stock"]
 
-        # Deviation berbasis konservasi massa
+        # Deviation rekonsiliasi
         # TWB_CM ≈ TWB_CH + Delta CPP Stock
         # TWB_CH ≈ Sales + Delta Port Stock
         dev_cpp = cm_twb - (ch_twb + delta_cpp)
         dev_port = ch_twb - (sales + delta_port)
 
-        # Rasio flow, bukan recovery
-        ch_ratio = (ch_twb / cm_twb * 100) if cm_twb not in [0, None] and pd.notna(cm_twb) else 0
-        sales_ratio = (sales / ch_twb * 100) if ch_twb not in [0, None] and pd.notna(ch_twb) else 0
+        # Flow ratio, bukan recovery
+        ch_ratio = (ch_twb / cm_twb * 100) if pd.notna(cm_twb) and cm_twb != 0 else 0
+        sales_ratio = (sales / ch_twb * 100) if pd.notna(ch_twb) and ch_twb != 0 else 0
 
         records.append({
             "Date": row["Date"],
@@ -1333,22 +1333,27 @@ def main():
         flow = create_flow(df_ch_cm)
 
         if flow is not None and len(flow) > 0:
-            avg_cm = flow["CM TWB"].mean()
-            avg_ch = flow["CH TWB"].mean()
-            avg_sales = flow["Sales"].mean()
+            latest_flow = flow.sort_values("Date").iloc[-1]
 
-            avg_delta_cpp = flow["Delta CPP Stock"].mean()
-            avg_delta_port = flow["Delta Port Stock"].mean()
+            disp_date = pd.to_datetime(latest_flow["Date"]).strftime("%d %b %Y")
+            disp_cm = latest_flow["CM TWB"]
+            disp_ch = latest_flow["CH TWB"]
+            disp_sales = latest_flow["Sales"]
 
-            avg_dev_cpp = flow["Deviation CPP"].mean()
-            avg_dev_port = flow["Deviation Port"].mean()
+            disp_delta_cpp = latest_flow["Delta CPP Stock"]
+            disp_delta_port = latest_flow["Delta Port Stock"]
 
-            avg_ch_ratio = flow["CH Flow Ratio (%)"].mean()
-            avg_sales_ratio = flow["Sales Flow Ratio (%)"].mean()
+            disp_dev_cpp = latest_flow["Deviation CPP"]
+            disp_dev_port = latest_flow["Deviation Port"]
 
-            # Skor overview sederhana berbasis deviation
-            total_ref = max(abs(avg_cm) + abs(avg_ch) + abs(avg_sales), 1)
-            overall_dev_score = max(0, 100 - ((abs(avg_dev_cpp) + abs(avg_dev_port)) / total_ref * 100))
+            disp_ch_ratio = latest_flow["CH Flow Ratio (%)"]
+            disp_sales_ratio = latest_flow["Sales Flow Ratio (%)"]
+
+            total_ref = max(abs(disp_cm) + abs(disp_ch) + abs(disp_sales), 1)
+            overall_dev_score = max(
+                0,
+                100 - ((abs(disp_dev_cpp) + abs(disp_dev_port)) / total_ref * 100)
+            )
 
             _r = 30
             _circ = 2 * 3.14159 * _r
@@ -1477,12 +1482,12 @@ def main():
             </head>
             <body>
             <div class="pipeline-wrap">
-                <div class="pipeline-title">Production Flow Summary</div>
+                <div class="pipeline-title">Production Flow Summary — {disp_date}</div>
                 <div class="pipe-chain">
                     <div class="pipe-node node-cm">
                         <div class="pipe-node-label">From PIT To CPP</div>
                         <div class="pipe-node-title">Coal Mining</div>
-                        <div class="pipe-node-value">{format_large(avg_cm)}</div>
+                        <div class="pipe-node-value">{format_large(disp_cm)}</div>
                     </div>
                     <div class="pipe-connector">
                         <div class="pipe-arrow-wrap">
@@ -1490,14 +1495,14 @@ def main():
                             <div class="pipe-arrow-tip"></div>
                         </div>
                         <div class="pipe-conn-stats">
-                            <span class="pipe-loss-badge loss-val">Δ {format_large(avg_delta_cpp)}</span>
-                            <span class="pipe-loss-badge eff-val">Dev {format_large(avg_dev_cpp)}</span>
+                            <span class="pipe-loss-badge loss-val">Δ {format_large(disp_delta_cpp)}</span>
+                            <span class="pipe-loss-badge eff-val">Dev {format_large(disp_dev_cpp)}</span>
                         </div>
                     </div>
                     <div class="pipe-node node-ch">
                         <div class="pipe-node-label">From CPP To Port</div>
                         <div class="pipe-node-title">Coal Hauling</div>
-                        <div class="pipe-node-value">{format_large(avg_ch)}</div>
+                        <div class="pipe-node-value">{format_large(disp_ch)}</div>
                     </div>
                     <div class="pipe-connector loss-connector">
                         <div class="pipe-arrow-wrap">
@@ -1505,14 +1510,14 @@ def main():
                             <div class="pipe-arrow-tip"></div>
                         </div>
                         <div class="pipe-conn-stats">
-                            <span class="pipe-loss-badge loss-val">Δ {format_large(avg_delta_port)}</span>
-                            <span class="pipe-loss-badge eff-val">Dev {format_large(avg_dev_port)}</span>
+                            <span class="pipe-loss-badge loss-val">Δ {format_large(disp_delta_port)}</span>
+                            <span class="pipe-loss-badge eff-val">Dev {format_large(disp_dev_port)}</span>
                         </div>
                     </div>
                     <div class="pipe-node node-sales">
                         <div class="pipe-node-label">From Port To Customer</div>
                         <div class="pipe-node-title">Sales</div>
-                        <div class="pipe-node-value">{format_large(avg_sales)}</div>
+                        <div class="pipe-node-value">{format_large(disp_sales)}</div>
                     </div>
                 </div>
 
@@ -1530,12 +1535,12 @@ def main():
                     <div class="pipe-footer-text">
                         <div class="pipe-footer-title">Reconciliation Deviation Overview</div>
                         <div class="pipe-footer-detail">
-                            CPP Dev <span class="hl-red">{format_large(avg_dev_cpp)}</span>
-                            · Port Dev <span class="hl-red">{format_large(avg_dev_port)}</span>
+                            CPP Dev <span class="hl-red">{format_large(disp_dev_cpp)}</span>
+                            · Port Dev <span class="hl-red">{format_large(disp_dev_port)}</span>
                         </div>
                         <div class="pipe-footer-detail">
-                            CH Ratio <span class="hl-green">{format_number(avg_ch_ratio, 1)}%</span>
-                            · Sales Ratio <span class="hl-green">{format_number(avg_sales_ratio, 1)}%</span>
+                            CH Ratio <span class="hl-green">{format_number(disp_ch_ratio, 1)}%</span>
+                            · Sales Ratio <span class="hl-green">{format_number(disp_sales_ratio, 1)}%</span>
                         </div>
                     </div>
                 </div>
@@ -1862,7 +1867,7 @@ def main():
                 )
 
                 fig_combined.update_yaxes(
-                    title=dict(text='Efficiency (%)', font=dict(color='#F59E0B', size=12)),
+                    title=dict(text='Flow Ratio (%)', font=dict(color='#F59E0B', size=12)),
                     tickformat='.0f',
                     ticksuffix='%',
                     gridcolor='rgba(0,0,0,0)',
@@ -1878,17 +1883,17 @@ def main():
                 # ══════════════════════════════════════════════════════════
                 # MATERIAL LOSS ANALYSIS — Enhanced Stacked + Cumulative
                 # ══════════════════════════════════════════════════════════
-                st.markdown("###  Material Loss Analysis")
+                 st.markdown("###  Reconciliation Deviation Analysis")
 
 
-                flow['Net Loss'] = flow['CM Loss'] + flow['CH Loss']
-                flow['Cum Net Loss'] = flow['Net Loss'].cumsum()
+                flow['Net Deviation'] = flow['Deviation CPP'] + flow['Deviation Port']
+                flow['Cum Net Deviation'] = flow['Net Deviation'].cumsum()
 
-                avg_net = flow['Net Loss'].mean()
-                std_loss = flow['Net Loss'].std() if len(flow) > 1 else 0
-                max_loss_val = flow['Net Loss'].min()
-                cum_total = flow['Cum Net Loss'].iloc[-1]
-                critical_count = (flow['Net Loss'].abs() > avg_cm * 0.02).sum()
+                avg_net = flow['Net Deviation'].mean()
+                std_loss = flow['Net Deviation'].std() if len(flow) > 1 else 0
+                max_loss_val = flow['Net Deviation'].min()
+                cum_total = flow['Cum Net Deviation'].iloc[-1]
+                critical_count = (flow['Net Deviation'].abs() > avg_cm * 0.02).sum()
                 total_periods = len(flow)
 
 
@@ -1946,19 +1951,20 @@ def main():
                     )
 
                 fig_loss.add_trace(go.Bar(
-                    x=flow['Date'], y=flow['CH Loss'],
-                    name='CH Loss',
+                    x=flow['Date'], y=flow['Deviation Port'],
+                    name='Port Deviation',
                     marker=dict(color='rgba(239,68,68,0.7)',
                            line=dict(width=0.5, color='rgba(239,68,68,0.9)')),
-                    hovertemplate='<b>CH Loss</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
+                    hovertemplate='<b>Port Deviation</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
+                ), secondary_y=False)
                 ), secondary_y=False)
 
                 fig_loss.add_trace(go.Bar(
-                    x=flow['Date'], y=flow['CM Loss'],
-                    name='CM Loss',
+                    x=flow['Date'], y=flow['Deviation CPP'],
+                    name='CPP33 Deviation',
                     marker=dict(color='rgba(234,179,8,0.7)',
                            line=dict(width=0.5, color='rgba(234,179,8,0.9)')),
-                    hovertemplate='<b>CM Loss</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
+                    hovertemplate='<b>CPP33 Deviation</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
                 ), secondary_y=False)
 
                 net_colors = []
@@ -2073,7 +2079,7 @@ def main():
                 )
 
                 fig_loss.update_yaxes(
-                    title=dict(text='Loss (ton)', font=dict(color='#94A3B8', size=11)),
+                    title=dict(text='Deviation (ton)', font=dict(color='#94A3B8', size=11)),
                     tickformat=',.0f',
                     gridcolor='rgba(148,163,184,0.08)',
                     tickfont=dict(size=10, color='#94A3B8'),
@@ -2082,7 +2088,7 @@ def main():
                 )
 
                 fig_loss.update_yaxes(
-                    title=dict(text='Cumulative (ton)', font=dict(color='#06b6d4', size=11)),
+                    title=dict(text='Cumulative Deviation (ton)', font=dict(color='#06b6d4', size=11)),
                     tickformat=',.0f',
                     gridcolor='rgba(0,0,0,0)',
                     tickfont=dict(size=10, color='#06b6d4'),

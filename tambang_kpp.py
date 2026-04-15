@@ -1459,7 +1459,7 @@ def main():
                 <div class="pipe-chain">
                     <div class="pipe-node node-cm">
                         <div class="pipe-node-label">To CPP33</div>
-                        <div class="pipe-node-title">CM TWB</div>
+                        <div class="pipe-node-title">Coal Mining</div>
                         <div class="pipe-node-value">{format_large(avg_cm)}</div>
                     </div>
                     <div class="pipe-connector">
@@ -1474,7 +1474,7 @@ def main():
                     </div>
                     <div class="pipe-node node-ch">
                         <div class="pipe-node-label">To Port</div>
-                        <div class="pipe-node-title">CH TWB</div>
+                        <div class="pipe-node-title">Coal Hauling</div>
                         <div class="pipe-node-value">{format_large(avg_ch)}</div>
                     </div>
                     <div class="pipe-connector loss-connector">

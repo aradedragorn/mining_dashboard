@@ -1863,14 +1863,15 @@ def main():
 
                 fig_combined.update_yaxes(
                     title=dict(text='Efficiency (%)', font=dict(color='#F59E0B', size=12)),
-                    tickformat='.0f', ticksuffix='%',
+                    tickformat='.0f',
+                    ticksuffix='%',
                     gridcolor='rgba(0,0,0,0)',
                     tickfont=dict(size=10, color='#F59E0B'),
-                    showline=False, zeroline=False,
-                    range=[0, max(130, flow['CH Flow Ratio (%)'].max() + 15)]
+                    showline=False,
+                    zeroline=False
+                    range=[0, max(130, flow['CH Flow Ratio (%)'].max() + 15)],
                     secondary_y=True,
                 )
-
                 st.plotly_chart(fig_combined, use_container_width=True, key='production_vol_eff')
 
 

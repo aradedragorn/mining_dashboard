@@ -41,7 +41,7 @@ DEMO_FILES = {
 def get_base64_image(image_path, size=(120, 120)):  # Diperbesar dari 60 ke 120
     try:
         # Baca gambar
-        if os.path.exists(image_path):
+        if Path(image_path).exists():
             img = Image.open(image_path)
             
             # Resize gambar ke ukuran yang diinginkan

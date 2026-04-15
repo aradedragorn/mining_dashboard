@@ -955,38 +955,49 @@ def create_matrix(df_ob, df_ch_cm):
     })
 
 def create_flow(df_ch_cm):
-    df = df_ch_cm.dropna(subset=['TWB_CM', 'TWB_CH'])
-    if len(df) == 0: 
+    df = df_ch_cm.dropna(subset=["TWB_CM", "TWB_CH"]).copy()
+    if len(df) == 0:
         return None
 
-    data = []
-    for idx, row in df.iterrows():
-        cm_twb = row['TWB_CM']
-        ch_twb = row['TWB_CH']
-        sales = row['Sales']
-        
-        # Hitung loss dan efficiency
-        cm_loss = cm_twb - ch_twb  # Loss dari CM ke CH
-        ch_loss = ch_twb - sales   # Loss dari CH ke Sales
-        
-        ch_eff = (ch_twb / cm_twb * 100) if cm_twb > 0 else 0
-        sales_eff = (sales / ch_twb * 100) if ch_twb > 0 else 0
-        overall_eff = (sales / cm_twb * 100) if cm_twb > 0 else 0
-        
-        data.append({
-            'Date': row['Date'],
-            'CPP Stock': row['CPP_Total'],
-            'CM TWB': cm_twb,
-            'Port Stock': row['Port_Total'],
-            'CH TWB': ch_twb,
-            'Sales': sales,
-            'CM Loss': cm_loss,
-            'CH Loss': ch_loss,
-            'CH Efficiency (%)': ch_eff,
-            'Sales Efficiency (%)': sales_eff,
-            'Overall Efficiency (%)': overall_eff
+    # Hitung perubahan stok periodik
+    df["Delta CPP Stock"] = df["CPP_Total"].diff().fillna(0)
+    df["Delta Port Stock"] = df["Port_Total"].diff().fillna(0)
+
+    records = []
+    for _, row in df.iterrows():
+        cm_twb = row["TWB_CM"]
+        ch_twb = row["TWB_CH"]
+        sales = row["Sales"]
+
+        delta_cpp = row["Delta CPP Stock"]
+        delta_port = row["Delta Port Stock"]
+
+        # Deviation berbasis konservasi massa
+        # TWB_CM ≈ TWB_CH + Delta CPP Stock
+        # TWB_CH ≈ Sales + Delta Port Stock
+        dev_cpp = cm_twb - (ch_twb + delta_cpp)
+        dev_port = ch_twb - (sales + delta_port)
+
+        # Rasio flow, bukan recovery
+        ch_ratio = (ch_twb / cm_twb * 100) if cm_twb not in [0, None] and pd.notna(cm_twb) else 0
+        sales_ratio = (sales / ch_twb * 100) if ch_twb not in [0, None] and pd.notna(ch_twb) else 0
+
+        records.append({
+            "Date": row["Date"],
+            "CPP Stock": row["CPP_Total"],
+            "Port Stock": row["Port_Total"],
+            "Delta CPP Stock": delta_cpp,
+            "Delta Port Stock": delta_port,
+            "CM TWB": cm_twb,
+            "CH TWB": ch_twb,
+            "Sales": sales,
+            "Deviation CPP": dev_cpp,
+            "Deviation Port": dev_port,
+            "CH Flow Ratio (%)": ch_ratio,
+            "Sales Flow Ratio (%)": sales_ratio,
         })
-    return pd.DataFrame(data)
+
+    return pd.DataFrame(records)
 
 # CHART THEME
 THEME = {
@@ -1322,22 +1333,28 @@ def main():
         flow = create_flow(df_ch_cm)
 
         if flow is not None and len(flow) > 0:
-            avg_cm = flow['CM TWB'].mean()
-            avg_ch = flow['CH TWB'].mean()
-            avg_sales = flow['Sales'].mean()
-            avg_cm_loss = flow['CM Loss'].mean()
-            avg_ch_loss = flow['CH Loss'].mean()
-            avg_ch_eff = flow['CH Efficiency (%)'].mean()
-            avg_sales_eff = flow['Sales Efficiency (%)'].mean()
-            avg_overall_eff = flow['Overall Efficiency (%)'].mean()
+            avg_cm = flow["CM TWB"].mean()
+            avg_ch = flow["CH TWB"].mean()
+            avg_sales = flow["Sales"].mean()
+
+            avg_delta_cpp = flow["Delta CPP Stock"].mean()
+            avg_delta_port = flow["Delta Port Stock"].mean()
+
+            avg_dev_cpp = flow["Deviation CPP"].mean()
+            avg_dev_port = flow["Deviation Port"].mean()
+
+            avg_ch_ratio = flow["CH Flow Ratio (%)"].mean()
+            avg_sales_ratio = flow["Sales Flow Ratio (%)"].mean()
+
+            # Skor overview sederhana berbasis deviation
+            total_ref = max(abs(avg_cm) + abs(avg_ch) + abs(avg_sales), 1)
+            overall_dev_score = max(0, 100 - ((abs(avg_dev_cpp) + abs(avg_dev_port)) / total_ref * 100))
 
             _r = 30
             _circ = 2 * 3.14159 * _r
-            _eff_pct = min(max(avg_overall_eff, 0), 100)
-            _offset = _circ * (1 - _eff_pct / 100)
-            _ring_color = "#22c55e" if _eff_pct >= 97 else "#f59e0b" if _eff_pct >= 93 else "#ef4444"
-            _total_loss = avg_cm - avg_sales
-            _recovery = avg_sales / avg_cm * 100 if avg_cm > 0 else 0
+            _score_pct = min(max(overall_dev_score, 0), 100)
+            _offset = _circ * (1 - _score_pct / 100)
+            _ring_color = "#22c55e" if _score_pct >= 98 else "#f59e0b" if _score_pct >= 95 else "#ef4444"
 
             import streamlit.components.v1 as components
 
@@ -1382,12 +1399,14 @@ def main():
             .pipe-node.node-cm   {{ background: linear-gradient(145deg, #064e3b, #065f46); border-color: rgba(34,197,94,0.25); }}
             .pipe-node.node-ch   {{ background: linear-gradient(145deg, #1e3a5f, #1d4ed8); border-color: rgba(59,130,246,0.25); }}
             .pipe-node.node-sales {{ background: linear-gradient(145deg, #4c1d95, #6d28d9); border-color: rgba(167,139,250,0.25); }}
+
             .pipe-node-label {{ font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 2px; }}
             .pipe-node-title {{ font-size: 1.05rem; font-weight: 700; color: #f1f5f9; }}
             .pipe-node-value {{ font-size: 1.5rem; font-weight: 800; margin-top: 8px; }}
             .pipe-node.node-cm .pipe-node-value    {{ color: #4ade80; }}
             .pipe-node.node-ch .pipe-node-value    {{ color: #60a5fa; }}
             .pipe-node.node-sales .pipe-node-value {{ color: #c4b5fd; }}
+
             .pipe-connector {{
                 display: flex; flex-direction: column; align-items: center;
                 justify-content: center; flex: 0 0 130px; padding: 0 6px;
@@ -1406,7 +1425,7 @@ def main():
                 animation: flowPulse 2.2s ease-in-out infinite;
             }}
             .pipe-connector.loss-connector .pipe-arrow-line::after {{
-                background: linear-gradient(90deg, transparent, #ef4444, transparent);
+                background: linear-gradient(90deg, transparent, #3b82f6, transparent);
                 animation-delay: 1.1s;
             }}
             @keyframes flowPulse {{
@@ -1432,6 +1451,7 @@ def main():
             }}
             .pipe-loss-badge.loss-val {{ background: rgba(239,68,68,0.15); color: #f87171; }}
             .pipe-loss-badge.eff-val  {{ background: rgba(34,197,94,0.12); color: #4ade80; }}
+
             .pipe-footer {{
                 display: flex; align-items: center; justify-content: center;
                 gap: 20px; margin-top: 26px; padding-top: 18px;
@@ -1442,11 +1462,13 @@ def main():
             .ring-bg            {{ fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 6; }}
             .ring-fg            {{ fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }}
             .ring-label         {{ position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 800; color: #f1f5f9; }}
+
             .pipe-footer-text   {{ display: flex; flex-direction: column; gap: 5px; }}
             .pipe-footer-title  {{ font-size: 0.85rem; color: #94a3b8; font-weight: 600; }}
             .pipe-footer-detail {{ font-size: 0.78rem; color: #64748b; }}
             .pipe-footer-detail .hl-green {{ color: #4ade80; font-weight: 700; }}
             .pipe-footer-detail .hl-red   {{ color: #f87171; font-weight: 700; }}
+
             @media (max-width: 700px) {{
                 .pipe-chain {{ flex-direction: column; gap: 8px; }}
                 .pipe-connector {{ transform: rotate(90deg); flex: 0 0 60px; }}
@@ -1468,8 +1490,8 @@ def main():
                             <div class="pipe-arrow-tip"></div>
                         </div>
                         <div class="pipe-conn-stats">
-                            <span class="pipe-loss-badge loss-val">▼ {format_large(avg_cm_loss)}</span>
-                            <span class="pipe-loss-badge eff-val">Eff {format_number(avg_ch_eff, 1)}%</span>
+                            <span class="pipe-loss-badge loss-val">Δ {format_large(avg_delta_cpp)}</span>
+                            <span class="pipe-loss-badge eff-val">Dev {format_large(avg_dev_cpp)}</span>
                         </div>
                     </div>
                     <div class="pipe-node node-ch">
@@ -1483,8 +1505,8 @@ def main():
                             <div class="pipe-arrow-tip"></div>
                         </div>
                         <div class="pipe-conn-stats">
-                            <span class="pipe-loss-badge loss-val">▼ {format_large(avg_ch_loss)}</span>
-                            <span class="pipe-loss-badge eff-val">Eff {format_number(avg_sales_eff, 1)}%</span>
+                            <span class="pipe-loss-badge loss-val">Δ {format_large(avg_delta_port)}</span>
+                            <span class="pipe-loss-badge eff-val">Dev {format_large(avg_dev_port)}</span>
                         </div>
                     </div>
                     <div class="pipe-node node-sales">
@@ -1493,6 +1515,7 @@ def main():
                         <div class="pipe-node-value">{format_large(avg_sales)}</div>
                     </div>
                 </div>
+
                 <div class="pipe-footer">
                     <div class="pipe-eff-ring">
                         <svg width="76" height="76" viewBox="0 0 76 76">
@@ -1502,13 +1525,17 @@ def main():
                                 stroke-dasharray="{_circ:.1f}"
                                 stroke-dashoffset="{_offset:.1f}"/>
                         </svg>
-                        <div class="ring-label">{format_number(avg_overall_eff, 1)}%</div>
+                        <div class="ring-label">{format_number(_score_pct, 1)}%</div>
                     </div>
                     <div class="pipe-footer-text">
-                        <div class="pipe-footer-title"> Overall Material Recovery (CM → Sales)</div>
+                        <div class="pipe-footer-title">Reconciliation Deviation Overview</div>
                         <div class="pipe-footer-detail">
-                            Total Loss <span class="hl-red">{format_large(_total_loss)}</span> ton/week
-                            · Recovery <span class="hl-green">{format_number(_recovery, 1)}%</span>
+                            CPP Dev <span class="hl-red">{format_large(avg_dev_cpp)}</span>
+                            · Port Dev <span class="hl-red">{format_large(avg_dev_port)}</span>
+                        </div>
+                        <div class="pipe-footer-detail">
+                            CH Ratio <span class="hl-green">{format_number(avg_ch_ratio, 1)}%</span>
+                            · Sales Ratio <span class="hl-green">{format_number(avg_sales_ratio, 1)}%</span>
                         </div>
                     </div>
                 </div>
@@ -1630,12 +1657,12 @@ def main():
                 flow['CM TWB Plot'] = flow['CM TWB'].replace(0, None)
                 flow['CH TWB Plot'] = flow['CH TWB'].replace(0, None)
                 flow['Sales Plot'] = flow['Sales'].replace(0, None)
-                flow['Eff Plot'] = flow['Overall Efficiency (%)'].replace(0, None)
+                flow['Eff Plot'] = flow['CH Flow Ratio (%)'].replace(0, None)
 
 
-                avg_eff_val = flow['Overall Efficiency (%)'].mean()
+                avg_eff_val = flow['CH Flow Ratio (%)'].mean()
                 peak_cm = flow['CM TWB'].max()
-                below_target = (flow['Overall Efficiency (%)'] < 100).sum()
+                below_target = (flow['CH Flow Ratio (%)'] < 100).sum()
                 total_p = len(flow)
 
 
@@ -1714,7 +1741,7 @@ def main():
 
 
                 eff_colors = []
-                for e in flow['Overall Efficiency (%)'].values:
+                for e in flow['CH Flow Ratio (%)'].values:
                     if e >= 100:
                         eff_colors.append('#22C55E')
                     elif e >= 90:
@@ -1778,11 +1805,11 @@ def main():
                     font=dict(size=10, color='#FFF'),
                     bgcolor='rgba(239,68,68,0.75)', borderpad=4)
 
-                eff_max_idx = flow['Overall Efficiency (%)'].idxmax()
+                eff_max_idx = flow['CH Flow Ratio (%)'].idxmax()
                 fig_combined.add_annotation(
                     x=flow.loc[eff_max_idx, 'Date'],
-                    y=flow.loc[eff_max_idx, 'Overall Efficiency (%)'],
-                    text=f"⚡ {flow.loc[eff_max_idx, 'Overall Efficiency (%)']:.1f}%",
+                    y=flow.loc[eff_max_idx, 'CH Flow Ratio (%)'],
+                    text=f"⚡ {flow.loc[eff_max_idx, 'CH Flow Ratio (%)']:.1f}%",
                     showarrow=True, arrowhead=2,
                     arrowwidth=1, arrowcolor='#F59E0B',
                     ax=20, ay=-25, yref='y2',
@@ -1840,7 +1867,7 @@ def main():
                     gridcolor='rgba(0,0,0,0)',
                     tickfont=dict(size=10, color='#F59E0B'),
                     showline=False, zeroline=False,
-                    range=[0, max(130, flow['Overall Efficiency (%)'].max() + 15)],
+                    range=[0, max(130, flow['CH Flow Ratio (%)'].max() + 15)]
                     secondary_y=True,
                 )
 

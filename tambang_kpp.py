@@ -3,9 +3,6 @@
     # FINAL VERSION v5.0 - Trend Analysis Diubah Menjadi Financial Analysis
     # Run: streamlit run dashboard_kpp_final_v5.py
 
-    import warnings
-    warnings.filterwarnings('ignore')
-
     import numpy as np
     import pandas as pd
     import plotly.graph_objects as go

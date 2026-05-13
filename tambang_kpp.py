@@ -1,8 +1,3 @@
-# dashboard_kpp_final_v5.py
-# PT KALIMANTAN PRIMA PERSADA - TWB Analytics Dashboard
-# FINAL VERSION v5.0 - Trend Analysis Diubah Menjadi Financial Analysis
-# Run: streamlit run dashboard_kpp_final_v5.py
-
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -795,7 +790,7 @@ def get_active_data_source():
 def sort_months_chronologically(month_list):
     """Mengurutkan bulan secara kronologis dari Januari-Desember"""
     month_order = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
     
     def month_key(month_str):
         # Format: "Februari-2024" atau "Februari"
@@ -879,9 +874,26 @@ def load_data(file):
         df_ob["Dev_Relatif_Pct"] = ((df_ob["JS"] - df_ob["TC"]) / df_ob["TC"]) * 100
         df_ob["Status"], df_ob["Status_Color"] = zip(*df_ob["Dev_Relatif_Pct"].apply(get_kpi_status))
 
-        # Load CH/CM data
+        # Load CH/CM data — support multiple column formats:
+        #   8-col  (format lama): Date, Port_Darat, Port_Laut, CPP_Raw, CPP_Product, Sales, CH_WB, CM_WB
+        #  16-col  (format extended): + PortTotal, CPPTotal, TWBCH, DevCH(%), StatusCH, TWBCM, DevCM(%), StatusCM
         df_ch_cm = pd.read_excel(file, sheet_name="CH CM", skiprows=1)
-        df_ch_cm.columns = ["Date", "Port_Darat", "Port_Laut", "CPP_Raw", "CPP_Product", "Sales", "CH_WB", "CM_WB"]
+        n_cols = df_ch_cm.shape[1]
+
+        if n_cols == 8:
+            # Format standar — rename langsung
+            df_ch_cm.columns = ["Date", "Port_Darat", "Port_Laut", "CPP_Raw", "CPP_Product", "Sales", "CH_WB", "CM_WB"]
+        elif n_cols == 16:
+            # Format extended — pilih 8 kolom yang dibutuhkan berdasarkan posisi:
+            # [0]Date [1]PortDarat [2]PortLaut [3]PortTotal(skip) [4]CPPRaw [5]CPPProduct
+            # [6]CPPTotal(skip) [7]Sales [8]CHWB [9..11]computed(skip) [12]CMWB [13..15]computed(skip)
+            df_ch_cm = df_ch_cm.iloc[:, [0, 1, 2, 4, 5, 7, 8, 12]].copy()
+            df_ch_cm.columns = ["Date", "Port_Darat", "Port_Laut", "CPP_Raw", "CPP_Product", "Sales", "CH_WB", "CM_WB"]
+        else:
+            # Fallback untuk format lain: ambil 8 kolom pertama
+            df_ch_cm = df_ch_cm.iloc[:, :8].copy()
+            df_ch_cm.columns = ["Date", "Port_Darat", "Port_Laut", "CPP_Raw", "CPP_Product", "Sales", "CH_WB", "CM_WB"]
+
         df_ch_cm = df_ch_cm.dropna(subset=["Date"])
         df_ch_cm["Date"] = pd.to_datetime(df_ch_cm["Date"])
 
@@ -889,6 +901,7 @@ def load_data(file):
         df_ch_cm["Port_Total"] = df_ch_cm["Port_Darat"] + df_ch_cm["Port_Laut"]
         df_ch_cm["CPP_Total"] = df_ch_cm["CPP_Raw"].fillna(0) + df_ch_cm["CPP_Product"].fillna(0)
 
+        
         # Baseline dari baris pertama
         if len(df_ch_cm) > 0:
             port_baseline = df_ch_cm["Port_Total"].iloc[0]
@@ -946,58 +959,826 @@ def create_matrix(df_ob, df_ch_cm):
     cm_avg = df_cm['Dev_CM_Relatif_Pct'].abs().mean() if len(df_cm) > 0 else 0
 
     return pd.DataFrame({
-        'Tahapan': ['Overburden (OB)', 'Coal Hauling (CH/Port)', 'Coal Mining (CM/CPP33)'],
+        'Tahapan': ['Overburden (OB)', 'Coal Hauling (CH/Port)', 'Coal Mining (CM/CPP)'],
         'Normal': [ob_normal, ch_normal, cm_normal],
         'Caution': [ob_caution, ch_caution, cm_caution],
         'Critical': [ob_critical, ch_critical, cm_critical],
         'Total': [len(df_ob), len(df_ch), len(df_cm)],
         'Avg': [ob_avg, ch_avg, cm_avg]
     })
-
 def create_flow(df_ch_cm):
-    df = df_ch_cm.dropna(subset=["TWB_CM", "TWB_CH"]).copy()
-    if len(df) == 0:
-        return None
+    """
+    Material Flow Analysis berbasis data periodik/mingguan.
 
-    # Perubahan stok antar periode
+    Fungsi ini dipakai untuk chart trend di bawah Production Flow Summary.
+    Production Flow Summary utama memakai create_eom_flow().
+    """
+
+    df = df_ch_cm.copy()
+
+    if df.empty:
+        return pd.DataFrame()
+
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.dropna(subset=["Date"]).sort_values("Date").reset_index(drop=True)
+
+    if df.empty:
+        return pd.DataFrame()
+
+    for col in ["Port_Darat", "Port_Laut", "CPP_Raw", "CPP_Product", "Sales", "CH_WB", "CM_WB"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    if "Port_Total" not in df.columns:
+        df["Port_Total"] = df["Port_Darat"].fillna(0) + df["Port_Laut"].fillna(0)
+
+    if "CPP_Total" not in df.columns:
+        df["CPP_Total"] = df["CPP_Raw"].fillna(0) + df["CPP_Product"].fillna(0)
+
+    if "TWB_CH" not in df.columns:
+        port_baseline = df["Port_Total"].iloc[0]
+        df["TWB_CH"] = df["Sales"].fillna(0) + df["Port_Total"] - port_baseline
+
+    if "TWB_CM" not in df.columns:
+        cpp_baseline = df["CPP_Total"].iloc[0]
+        df["TWB_CM"] = df["TWB_CH"] + df["CPP_Total"] - cpp_baseline
+
+    df = df.dropna(subset=["TWB_CM", "TWB_CH"]).copy()
+
+    if df.empty:
+        return pd.DataFrame()
+
     df["Delta CPP Stock"] = df["CPP_Total"].diff().fillna(0)
     df["Delta Port Stock"] = df["Port_Total"].diff().fillna(0)
 
     records = []
+
     for _, row in df.iterrows():
         cm_twb = row["TWB_CM"]
         ch_twb = row["TWB_CH"]
-        sales = row["Sales"]
+        sales = row["Sales"] if pd.notna(row["Sales"]) else 0
 
         delta_cpp = row["Delta CPP Stock"]
         delta_port = row["Delta Port Stock"]
 
-        # Deviation rekonsiliasi
-        # TWB_CM ≈ TWB_CH + Delta CPP Stock
-        # TWB_CH ≈ Sales + Delta Port Stock
-        dev_cpp = cm_twb - (ch_twb + delta_cpp)
-        dev_port = ch_twb - (sales + delta_port)
+        cm_to_ch_deviation = ch_twb - cm_twb
+        ch_to_sales_deviation = sales - ch_twb
 
-        # Flow ratio, bukan recovery
-        ch_ratio = (ch_twb / cm_twb * 100) if pd.notna(cm_twb) and cm_twb != 0 else 0
-        sales_ratio = (sales / ch_twb * 100) if pd.notna(ch_twb) and ch_twb != 0 else 0
+        ch_ratio = (
+            ch_twb / cm_twb * 100
+            if pd.notna(cm_twb) and cm_twb != 0
+            else 0
+        )
+
+        sales_ratio = (
+            sales / ch_twb * 100
+            if pd.notna(ch_twb) and ch_twb != 0
+            else 0
+        )
+
+        cm_to_ch_deviation_pct = (
+            cm_to_ch_deviation / cm_twb * 100
+            if pd.notna(cm_twb) and cm_twb != 0
+            else 0
+        )
+
+        ch_to_sales_deviation_pct = (
+            ch_to_sales_deviation / ch_twb * 100
+            if pd.notna(ch_twb) and ch_twb != 0
+            else 0
+        )
 
         records.append({
             "Date": row["Date"],
+
             "CPP Stock": row["CPP_Total"],
             "Port Stock": row["Port_Total"],
             "Delta CPP Stock": delta_cpp,
             "Delta Port Stock": delta_port,
+
             "CM TWB": cm_twb,
             "CH TWB": ch_twb,
             "Sales": sales,
-            "Deviation CPP": dev_cpp,
-            "Deviation Port": dev_port,
+
+            "Deviation CPP": cm_to_ch_deviation,
+            "Deviation Port": ch_to_sales_deviation,
+
+            "CM to CH Flow Deviation": cm_to_ch_deviation,
+            "CH to Sales Flow Deviation": ch_to_sales_deviation,
+            "CM to CH Flow Deviation (%)": cm_to_ch_deviation_pct,
+            "CH to Sales Flow Deviation (%)": ch_to_sales_deviation_pct,
+
             "CH Flow Ratio (%)": ch_ratio,
             "Sales Flow Ratio (%)": sales_ratio,
         })
 
     return pd.DataFrame(records)
+
+
+# NOTE: First duplicate create_eom_flow removed — active definition is below.
+
+def format_flow_deviation(value):
+    if pd.isna(value):
+        return "-"
+    sign = "+" if value > 0 else ""
+    return f"{sign}{format_large(value)}"
+
+
+def get_flow_deviation_class(value):
+    if pd.isna(value):
+        return "neutral-dev"
+    return "positive-dev" if value >= 0 else "negative-dev"
+
+
+def render_production_flow_summary(df_ch_cm):
+    """
+    Render Production Flow Summary berbasis EOM/MTD.
+    Aman untuk data 3 bulan, 1 bulan, atau file tanpa baseline eksplisit.
+    """
+
+    import streamlit.components.v1 as components
+
+    flow = create_flow(df_ch_cm)
+    if flow is None:
+        flow = pd.DataFrame()
+
+    eom_flow = create_eom_flow(df_ch_cm)
+    if eom_flow is None:
+        eom_flow = pd.DataFrame()
+
+    if len(eom_flow) == 0:
+        st.warning(
+            "Production Flow Summary belum bisa ditampilkan. "
+            "Pastikan file memiliki minimal satu baris stok awal dan satu baris data Sales / CH WB / CM WB."
+        )
+        return flow, eom_flow
+
+    st.markdown("""
+    <div style="margin:0.4rem 0 0.8rem 0;
+                padding:0.75rem 1rem;
+                background:rgba(15,23,42,0.75);
+                border:1px solid rgba(148,163,184,0.12);
+                border-radius:12px;">
+        <div style="font-size:0.75rem;color:#94a3b8;font-weight:700;
+                    text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.45rem;">
+            EOM / MTD Period Selection
+        </div>
+        <div style="font-size:0.78rem;color:#cbd5e1;">
+            TWB dihitung menggunakan baseline stok awal dan stok akhir periode. 
+            Jika baseline akhir belum tersedia, sistem memakai estimasi MTD dari data terakhir.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    eom_labels = eom_flow["Period Label"].tolist()
+
+    selected_eom_label = st.selectbox(
+        "Pilih Periode EOM",
+        eom_labels,
+        index=len(eom_labels) - 1,
+        key="production_flow_eom_selector"
+    )
+
+    latest_flow = eom_flow[eom_flow["Period Label"] == selected_eom_label].iloc[0]
+
+    disp_date = selected_eom_label
+    disp_cm = latest_flow["CM TWB"]
+    disp_ch = latest_flow["CH TWB"]
+    disp_sales = latest_flow["Sales"]
+
+    disp_dev_cpp = latest_flow["Deviation CPP"]
+    disp_dev_port = latest_flow["Deviation Port"]
+
+    disp_ch_ratio = latest_flow["CH Flow Ratio (%)"]
+    disp_sales_ratio = latest_flow["Sales Flow Ratio (%)"]
+
+    total_ref = max(abs(disp_cm) + abs(disp_ch), 1)
+
+    overall_dev_score = max(
+        0,
+        100 - ((abs(disp_dev_cpp) + abs(disp_dev_port)) / total_ref * 100)
+    )
+
+    _r = 30
+    _circ = 2 * 3.14159 * _r
+    _score_pct = min(max(overall_dev_score, 0), 100)
+    _offset = _circ * (1 - _score_pct / 100)
+    _ring_color = "#22c55e" if _score_pct >= 98 else "#f59e0b" if _score_pct >= 95 else "#ef4444"
+
+    pipeline_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+
+    body {{
+        background: transparent;
+        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        overflow: hidden;
+    }}
+
+    .pipeline-wrap {{
+        background: linear-gradient(135deg, rgba(30,41,59,0.85), rgba(15,23,42,0.95));
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px;
+        padding: 32px 28px 24px;
+        width: 100%;
+    }}
+
+    .pipeline-title {{
+        text-align: center;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #e2e8f0;
+        margin-bottom: 28px;
+        letter-spacing: 0.02em;
+    }}
+
+    .pipe-chain {{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        width: 100%;
+        padding: 0 8px;
+    }}
+
+    .pipe-node {{
+        flex: 1;
+        max-width: 220px;
+        min-width: 160px;
+        padding: 20px 18px 16px;
+        border-radius: 14px;
+        text-align: center;
+        border: 1.5px solid rgba(255,255,255,0.1);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        cursor: default;
+    }}
+
+    .pipe-node:hover {{
+        transform: translateY(-4px) scale(1.03);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+        z-index: 2;
+    }}
+
+    .pipe-node.node-cm {{
+        background: linear-gradient(145deg, #064e3b, #065f46);
+        border-color: rgba(34,197,94,0.25);
+    }}
+
+    .pipe-node.node-ch {{
+        background: linear-gradient(145deg, #1e3a5f, #1d4ed8);
+        border-color: rgba(59,130,246,0.25);
+    }}
+
+    .pipe-node.node-sales {{
+        background: linear-gradient(145deg, #4c1d95, #6d28d9);
+        border-color: rgba(167,139,250,0.25);
+    }}
+
+    .pipe-node-label {{
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #94a3b8;
+        margin-bottom: 2px;
+    }}
+
+    .pipe-node-title {{
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #f1f5f9;
+    }}
+
+    .pipe-node-value {{
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin-top: 8px;
+    }}
+
+    .pipe-node.node-cm .pipe-node-value {{ color: #4ade80; }}
+    .pipe-node.node-ch .pipe-node-value {{ color: #60a5fa; }}
+    .pipe-node.node-sales .pipe-node-value {{ color: #c4b5fd; }}
+
+    .pipe-connector {{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 160px;
+        padding: 0 8px;
+        position: relative;
+    }}
+
+    .pipe-arrow-wrap {{
+        position: relative;
+        width: 100%;
+        height: 16px;
+        display: flex;
+        align-items: center;
+    }}
+
+    .pipe-arrow-line {{
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, transparent 0%, #475569 12%, #475569 88%, transparent 100%);
+        position: relative;
+        overflow: hidden;
+        border-radius: 2px;
+    }}
+
+    .pipe-arrow-line::after {{
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -20px;
+        width: 20px;
+        height: 7px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, transparent, #22c55e, transparent);
+        animation: flowPulse 2.2s ease-in-out infinite;
+    }}
+
+    .pipe-connector.loss-connector .pipe-arrow-line::after {{
+        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        animation-delay: 1.1s;
+    }}
+
+    @keyframes flowPulse {{
+        0% {{ left: -20px; opacity: 0; }}
+        20% {{ opacity: 1; }}
+        80% {{ opacity: 1; }}
+        100% {{ left: calc(100% + 20px); opacity: 0; }}
+    }}
+
+    .pipe-arrow-tip {{
+        width: 0;
+        height: 0;
+        border-top: 7px solid transparent;
+        border-bottom: 7px solid transparent;
+        border-left: 11px solid #475569;
+        flex-shrink: 0;
+        margin-left: -1px;
+    }}
+
+    .pipe-conn-stats {{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        margin-top: 10px;
+    }}
+
+    .pipe-loss-badge {{
+        font-size: 0.70rem;
+        padding: 4px 9px;
+        border-radius: 999px;
+        font-weight: 800;
+        white-space: nowrap;
+        letter-spacing: -0.01em;
+        line-height: 1.1;
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    }}
+
+    .pipe-loss-badge.flow-dev {{
+        background: linear-gradient(135deg, rgba(45,212,191,0.16), rgba(59,130,246,0.16));
+        color: #dbeafe !important;
+        border-color: rgba(96,165,250,0.30);
+    }}
+
+    .pipe-loss-badge.eff-val {{
+        background: linear-gradient(135deg, rgba(59,130,246,0.20), rgba(30,64,175,0.25));
+        color: #bfdbfe !important;
+        border-color: rgba(59,130,246,0.35);
+    }}
+
+    .positive-dev {{
+        color: #4ade80 !important;
+        font-weight: 800;
+    }}
+
+    .negative-dev {{
+        color: #f87171 !important;
+        font-weight: 800;
+    }}
+
+    .neutral-dev {{
+        color: #cbd5e1 !important;
+        font-weight: 800;
+    }}
+
+    .pipe-footer {{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 26px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(255,255,255,0.06);
+    }}
+
+    .pipe-eff-ring {{
+        width: 76px;
+        height: 76px;
+        position: relative;
+        flex-shrink: 0;
+    }}
+
+    .pipe-eff-ring svg {{
+        transform: rotate(-90deg);
+    }}
+
+    .ring-bg {{
+        fill: none;
+        stroke: rgba(255,255,255,0.08);
+        stroke-width: 6;
+    }}
+
+    .ring-fg {{
+        fill: none;
+        stroke-width: 6;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 1s ease;
+    }}
+
+    .ring-label {{
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        font-weight: 800;
+        color: #f1f5f9;
+    }}
+
+    .pipe-footer-text {{
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }}
+
+    .pipe-footer-title {{
+        font-size: 0.85rem;
+        color: #94a3b8;
+        font-weight: 600;
+    }}
+
+    .pipe-footer-detail {{
+        font-size: 0.78rem;
+        color: #64748b;
+    }}
+
+    .pipe-footer-detail .hl-green {{
+        color: #4ade80;
+        font-weight: 700;
+    }}
+
+    @media (max-width: 700px) {{
+        .pipe-chain {{
+            flex-direction: column;
+            gap: 8px;
+        }}
+
+        .pipe-connector {{
+            transform: rotate(90deg);
+            flex: 0 0 60px;
+        }}
+    }}
+    </style>
+    </head>
+
+    <body>
+        <div class="pipeline-wrap">
+            <div class="pipeline-title">Production Flow Summary — {disp_date}</div>
+
+            <div class="pipe-chain">
+                <div class="pipe-node node-cm">
+                    <div class="pipe-node-label">From PIT To CPP</div>
+                    <div class="pipe-node-title">Coal Mining</div>
+                    <div class="pipe-node-value">{format_large(disp_cm)}</div>
+                </div>
+
+                <div class="pipe-connector">
+                    <div class="pipe-arrow-wrap">
+                        <div class="pipe-arrow-line"></div>
+                        <div class="pipe-arrow-tip"></div>
+                    </div>
+
+                    <div class="pipe-conn-stats">
+                        <span class="pipe-loss-badge flow-dev">
+                            CM→CH Dev {format_flow_deviation(disp_dev_cpp)}
+                        </span>
+                        <span class="pipe-loss-badge eff-val">
+                            CH Ratio {format_number(disp_ch_ratio, 1)}%
+                        </span>
+                    </div>
+                </div>
+
+                <div class="pipe-node node-ch">
+                    <div class="pipe-node-label">From CPP To Port</div>
+                    <div class="pipe-node-title">Coal Hauling</div>
+                    <div class="pipe-node-value">{format_large(disp_ch)}</div>
+                </div>
+
+                <div class="pipe-connector loss-connector">
+                    <div class="pipe-arrow-wrap">
+                        <div class="pipe-arrow-line"></div>
+                        <div class="pipe-arrow-tip"></div>
+                    </div>
+
+                    <div class="pipe-conn-stats">
+                        <span class="pipe-loss-badge flow-dev">
+                            CH→Sales Dev {format_flow_deviation(disp_dev_port)}
+                        </span>
+                        <span class="pipe-loss-badge eff-val">
+                            Sales Ratio {format_number(disp_sales_ratio, 1)}%
+                        </span>
+                    </div>
+                </div>
+
+                <div class="pipe-node node-sales">
+                    <div class="pipe-node-label">From Port To Customer</div>
+                    <div class="pipe-node-title">Sales</div>
+                    <div class="pipe-node-value">{format_large(disp_sales)}</div>
+                </div>
+            </div>
+
+            <div class="pipe-footer">
+                <div class="pipe-eff-ring">
+                    <svg width="76" height="76" viewBox="0 0 76 76">
+                        <circle class="ring-bg" cx="38" cy="38" r="{_r}"/>
+                        <circle class="ring-fg" cx="38" cy="38" r="{_r}"
+                            stroke="{_ring_color}"
+                            stroke-dasharray="{_circ:.1f}"
+                            stroke-dashoffset="{_offset:.1f}"/>
+                    </svg>
+                    <div class="ring-label">{format_number(_score_pct, 1)}%</div>
+                </div>
+
+                <div class="pipe-footer-text">
+                    <div class="pipe-footer-title">Material Flow Deviation Overview</div>
+                    <div class="pipe-footer-detail">
+                        CM→CH Dev
+                        <span class="{get_flow_deviation_class(disp_dev_cpp)}">{format_flow_deviation(disp_dev_cpp)}</span>
+                        · CH→Sales Dev
+                        <span class="{get_flow_deviation_class(disp_dev_port)}">{format_flow_deviation(disp_dev_port)}</span>
+                    </div>
+                    <div class="pipe-footer-detail">
+                        CH Ratio <span class="hl-green">{format_number(disp_ch_ratio, 1)}%</span>
+                        · Sales Ratio <span class="hl-green">{format_number(disp_sales_ratio, 1)}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    components.html(pipeline_html, height=340, scrolling=False)
+
+    return flow, eom_flow
+
+def create_eom_flow(df_ch_cm):
+    """
+    Production Flow Summary EOM berbasis baseline stok.
+
+    Mendukung:
+    1. Multi baseline:
+    baseline awal -> baseline akhir
+
+    2. Single baseline:
+    baseline awal -> row terakhir yang memiliki Sales / CH_WB / CM_WB
+
+    3. Tanpa baseline eksplisit:
+    row pertama -> row terakhir valid
+    Ini dipakai agar file satu bulan tetap bisa menampilkan Production Flow Summary.
+
+    Asumsi:
+    Sales, CH_WB, dan CM_WB adalah nilai kumulatif/MTD.
+    Maka EOM memakai nilai terakhir, bukan sum.
+    """
+
+    df = df_ch_cm.copy()
+
+    if df.empty:
+        return pd.DataFrame()
+
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.dropna(subset=["Date"]).sort_values("Date").reset_index(drop=True)
+
+    if df.empty:
+        return pd.DataFrame()
+
+    for col in ["Port_Darat", "Port_Laut", "CPP_Raw", "CPP_Product", "Sales", "CH_WB", "CM_WB"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df["Port_Total"] = df["Port_Darat"].fillna(0) + df["Port_Laut"].fillna(0)
+    df["CPP_Total"] = df["CPP_Raw"].fillna(0) + df["CPP_Product"].fillna(0)
+
+    baseline_mask = (
+        df["Date"].notna()
+        & df["Port_Total"].notna()
+        & df["CPP_Total"].notna()
+        & df["Sales"].isna()
+        & df["CH_WB"].isna()
+        & df["CM_WB"].isna()
+    )
+
+    baseline_df = df[baseline_mask].copy().reset_index()
+    records = []
+
+    def build_record(start_idx, end_idx, period_rows, label_suffix="EOM"):
+        if period_rows.empty:
+            return None
+
+        start_row = df.loc[start_idx]
+        end_row = df.loc[end_idx]
+
+        valid_sales = period_rows["Sales"].dropna()
+        valid_ch_wb = period_rows["CH_WB"].dropna()
+        valid_cm_wb = period_rows["CM_WB"].dropna()
+
+        if valid_sales.empty:
+            return None
+
+        sales_period = valid_sales.iloc[-1]
+        ch_wb_period = valid_ch_wb.iloc[-1] if not valid_ch_wb.empty else np.nan
+        cm_wb_period = valid_cm_wb.iloc[-1] if not valid_cm_wb.empty else np.nan
+
+        port_start = start_row["Port_Total"]
+        port_end = end_row["Port_Total"]
+
+        cpp_start = start_row["CPP_Total"]
+        cpp_end = end_row["CPP_Total"]
+
+        delta_port_stock = port_end - port_start
+        delta_cpp_stock = cpp_end - cpp_start
+
+        twb_ch_eom = sales_period + delta_port_stock
+        twb_cm_eom = twb_ch_eom + delta_cpp_stock
+
+        cm_to_ch_deviation = twb_ch_eom - twb_cm_eom
+        ch_to_sales_deviation = sales_period - twb_ch_eom
+
+        ch_ratio = (
+            twb_ch_eom / twb_cm_eom * 100
+            if pd.notna(twb_cm_eom) and twb_cm_eom != 0
+            else 0
+        )
+
+        sales_ratio = (
+            sales_period / twb_ch_eom * 100
+            if pd.notna(twb_ch_eom) and twb_ch_eom != 0
+            else 0
+        )
+
+        dev_ch_wb_abs = (
+            twb_ch_eom - ch_wb_period
+            if pd.notna(ch_wb_period)
+            else np.nan
+        )
+
+        dev_cm_wb_abs = (
+            twb_cm_eom - cm_wb_period
+            if pd.notna(cm_wb_period)
+            else np.nan
+        )
+
+        dev_ch_wb_pct = (
+            dev_ch_wb_abs / ch_wb_period * 100
+            if pd.notna(ch_wb_period) and ch_wb_period != 0
+            else np.nan
+        )
+
+        dev_cm_wb_pct = (
+            dev_cm_wb_abs / cm_wb_period * 100
+            if pd.notna(cm_wb_period) and cm_wb_period != 0
+            else np.nan
+        )
+
+        end_date = end_row["Date"]
+
+        period_label = (
+            f"{end_date.strftime('%b %Y')} — "
+            f"{label_suffix} {end_date.strftime('%d %b %Y')}"
+        )
+
+        return {
+            "Period Label": period_label,
+            "Period Start": start_row["Date"],
+            "Period End": end_date,
+
+            "Port Start": port_start,
+            "Port End": port_end,
+            "CPP Start": cpp_start,
+            "CPP End": cpp_end,
+
+            "Delta Port Stock": delta_port_stock,
+            "Delta CPP Stock": delta_cpp_stock,
+
+            "Sales": sales_period,
+            "CH WB": ch_wb_period,
+            "CM WB": cm_wb_period,
+
+            "CH TWB": twb_ch_eom,
+            "CM TWB": twb_cm_eom,
+
+            "Deviation CPP": cm_to_ch_deviation,
+            "Deviation Port": ch_to_sales_deviation,
+
+            "CM to CH Flow Deviation": cm_to_ch_deviation,
+            "CH to Sales Flow Deviation": ch_to_sales_deviation,
+
+            "CH Flow Ratio (%)": ch_ratio,
+            "Sales Flow Ratio (%)": sales_ratio,
+
+            "Dev CH WB Absolut": dev_ch_wb_abs,
+            "Dev CH WB Relatif (%)": dev_ch_wb_pct,
+            "Dev CM WB Absolut": dev_cm_wb_abs,
+            "Dev CM WB Relatif (%)": dev_cm_wb_pct,
+        }
+
+    # CASE 1: baseline kuning lebih dari satu
+    if len(baseline_df) >= 2:
+        for i in range(1, len(baseline_df)):
+            start_idx = int(baseline_df.loc[i - 1, "index"])
+            end_idx = int(baseline_df.loc[i, "index"])
+
+            period_rows = df.loc[start_idx + 1:end_idx - 1].copy()
+
+            record = build_record(
+                start_idx=start_idx,
+                end_idx=end_idx,
+                period_rows=period_rows,
+                label_suffix="EOM"
+            )
+
+            if record is not None:
+                records.append(record)
+
+    # CASE 2: hanya satu baseline kuning
+    elif len(baseline_df) == 1:
+        start_idx = int(baseline_df.loc[0, "index"])
+
+        valid_after = df.loc[start_idx + 1:].copy()
+        valid_after = valid_after[
+            valid_after["Sales"].notna()
+            | valid_after["CH_WB"].notna()
+            | valid_after["CM_WB"].notna()
+        ]
+
+        if not valid_after.empty:
+            end_idx = int(valid_after.index[-1])
+            period_rows = df.loc[start_idx + 1:end_idx].copy()
+
+            record = build_record(
+                start_idx=start_idx,
+                end_idx=end_idx,
+                period_rows=period_rows,
+                label_suffix="MTD"
+            )
+
+            if record is not None:
+                records.append(record)
+
+    # CASE 3: tidak ada baseline kuning, khusus file satu bulan
+    else:
+        valid_rows = df[
+            df["Sales"].notna()
+            | df["CH_WB"].notna()
+            | df["CM_WB"].notna()
+        ].copy()
+
+        if not valid_rows.empty:
+            start_idx = 0
+            end_idx = int(valid_rows.index[-1])
+
+            if end_idx > start_idx:
+                period_rows = df.loc[start_idx + 1:end_idx].copy()
+            else:
+                period_rows = df.loc[start_idx:end_idx].copy()
+
+            record = build_record(
+                start_idx=start_idx,
+                end_idx=end_idx,
+                period_rows=period_rows,
+                label_suffix="MTD"
+            )
+
+            if record is not None:
+                records.append(record)
+
+    return pd.DataFrame(records)
+
+# NOTE: Duplicate (broken) create_eom_flow definition removed here.
+# The active definition is above (line ~1765) which handles single-baseline and no-baseline data.
 
 # CHART THEME
 THEME = {
@@ -1024,7 +1805,7 @@ def main():
             </div>
             <div class="title-wrapper">
                 <h1 class="main-title">Mining Volume Deviation Monitoring</h1>
-                <p class="main-subtitle">PT KALIMANTAN PRIMA PERSADA</p>
+                <p class="main-subtitle"></p>
             </div>
             <div class="stats-grid">
                 <div class="stat-card">
@@ -1117,7 +1898,7 @@ def main():
     tab1, tab2, tab3, tab4 = st.tabs([
         " Overview",
         " OB Analysis",
-        " CPP33 & Port",
+        " CPP & Port",
         " Reports"
     ])
 
@@ -1284,8 +2065,8 @@ def main():
         cm_disp_es = matrix.iloc[2]['Avg'] if len(matrix) > 2 else 0
 
         worst_stage_es = "Coal Hauling (CH)" if ch_disp_es >= cm_disp_es and ch_disp_es >= ob_disp_es else \
-                         "Coal Mining (CM)" if cm_disp_es >= ch_disp_es and cm_disp_es >= ob_disp_es else \
-                         "Overburden (OB)"
+                        "Coal Mining (CM)" if cm_disp_es >= ch_disp_es and cm_disp_es >= ob_disp_es else \
+                        "Overburden (OB)"
         worst_val_es = max(ch_disp_es, cm_disp_es, ob_disp_es)
         best_stage_es = "Coal Hauling (CH)" if ch_disp_es <= cm_disp_es and ch_disp_es <= ob_disp_es else \
                         "Coal Mining (CM)" if cm_disp_es <= ch_disp_es and cm_disp_es <= ob_disp_es else \
@@ -1331,11 +2112,42 @@ def main():
         """, unsafe_allow_html=True)
 
         flow = create_flow(df_ch_cm)
+        if flow is None:
+            flow = pd.DataFrame()
 
-        if flow is not None and len(flow) > 0:
-            latest_flow = flow.sort_values("Date").iloc[-1]
+        eom_flow = create_eom_flow(df_ch_cm)
+        if eom_flow is None:
+            eom_flow = pd.DataFrame()
 
-            disp_date = pd.to_datetime(latest_flow["Date"]).strftime("%d %b %Y")
+        if eom_flow is not None and len(eom_flow) > 0:
+            st.markdown("""
+            <div style="margin:0.4rem 0 0.8rem 0;
+                        padding:0.75rem 1rem;
+                        background:rgba(15,23,42,0.75);
+                        border:1px solid rgba(148,163,184,0.12);
+                        border-radius:12px;">
+                <div style="font-size:0.75rem;color:#94a3b8;font-weight:700;
+                            text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.45rem;">
+                    EOM Period Selection
+                </div>
+                <div style="font-size:0.78rem;color:#cbd5e1;">
+                    TWB dihitung menggunakan baseline stok awal dan stok akhir periode EOM.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            eom_labels = eom_flow["Period Label"].tolist()
+
+            selected_eom_label = st.selectbox(
+                "Pilih Periode EOM",
+                eom_labels,
+                index=len(eom_labels) - 1,
+                key="production_flow_eom_selector"
+            )
+
+            latest_flow = eom_flow[eom_flow["Period Label"] == selected_eom_label].iloc[0]
+
+            disp_date = selected_eom_label
             disp_cm = latest_flow["CM TWB"]
             disp_ch = latest_flow["CH TWB"]
             disp_sales = latest_flow["Sales"]
@@ -1349,11 +2161,12 @@ def main():
             disp_ch_ratio = latest_flow["CH Flow Ratio (%)"]
             disp_sales_ratio = latest_flow["Sales Flow Ratio (%)"]
 
-            total_ref = max(abs(disp_cm) + abs(disp_ch) + abs(disp_sales), 1)
+            total_ref = max(abs(disp_cm) + abs(disp_ch), 1)
+
             overall_dev_score = max(
                 0,
                 100 - ((abs(disp_dev_cpp) + abs(disp_dev_port)) / total_ref * 100)
-            )
+            )       
 
             _r = 30
             _circ = 2 * 3.14159 * _r
@@ -1363,6 +2176,22 @@ def main():
 
             import streamlit.components.v1 as components
 
+            def get_flow_deviation_class(value):
+                if pd.isna(value):
+                    return "neutral-dev"
+                return "positive-dev" if value >= 0 else "negative-dev"
+            def format_flow_deviation(value):
+                if pd.isna(value):
+                    return "-"
+                sign = "+" if value > 0 else ""
+                return f"{sign}{format_large(value)}"
+
+
+            def get_flow_deviation_class(value):
+                if pd.isna(value):
+                    return "neutral-dev"
+                return "positive-dev" if value >= 0 else "negative-dev"
+                    
             pipeline_html = f"""
             <!DOCTYPE html>
             <html>
@@ -1413,8 +2242,12 @@ def main():
             .pipe-node.node-sales .pipe-node-value {{ color: #c4b5fd; }}
 
             .pipe-connector {{
-                display: flex; flex-direction: column; align-items: center;
-                justify-content: center; flex: 0 0 130px; padding: 0 6px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                flex: 0 0 160px;
+                padding: 0 8px;
                 position: relative;
             }}
             .pipe-arrow-wrap {{ position: relative; width: 100%; height: 16px; display: flex; align-items: center; }}
@@ -1449,13 +2282,48 @@ def main():
                 display: flex; flex-direction: column; align-items: center;
                 gap: 3px; margin-top: 10px;
             }}
-            .pipe-loss-badge {{
-                font-size: 0.72rem; padding: 3px 10px;
-                border-radius: 10px; font-weight: 600;
-                white-space: nowrap;
-            }}
-            .pipe-loss-badge.loss-val {{ background: rgba(239,68,68,0.15); color: #f87171; }}
-            .pipe-loss-badge.eff-val  {{ background: rgba(34,197,94,0.12); color: #4ade80; }}
+        .pipe-loss-badge {{
+            font-size: 0.70rem;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-weight: 800;
+            white-space: nowrap;
+            letter-spacing: -0.01em;
+            line-height: 1.1;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+        }}
+
+        .pipe-loss-badge.flow-dev {{
+            background: linear-gradient(135deg, rgba(45,212,191,0.16), rgba(59,130,246,0.16));
+            color: #dbeafe !important;
+            border-color: rgba(96,165,250,0.30);
+        }}
+
+        .pipe-loss-badge.eff-val {{
+            background: linear-gradient(135deg, rgba(59,130,246,0.20), rgba(30,64,175,0.25));
+            color: #bfdbfe !important;
+            border-color: rgba(59,130,246,0.35);
+        }}
+
+        .positive-dev {{
+            color: #4ade80 !important;
+            font-weight: 800;
+        }}
+
+        .negative-dev {{
+            color: #f87171 !important;
+            font-weight: 800;
+        }}
+
+        .neutral-dev {{
+            color: #cbd5e1 !important;
+            font-weight: 800;
+        }}
+
+        .pipe-footer-dev {{
+            font-weight: 800;
+        }}
 
             .pipe-footer {{
                 display: flex; align-items: center; justify-content: center;
@@ -1495,8 +2363,12 @@ def main():
                             <div class="pipe-arrow-tip"></div>
                         </div>
                         <div class="pipe-conn-stats">
-                            <span class="pipe-loss-badge loss-val">Δ stok CPP33 {format_large(disp_delta_cpp)}</span>
-                            <span class="pipe-loss-badge eff-val">Dev {format_large(disp_dev_cpp)}</span>
+                    <span class="pipe-loss-badge flow-dev">
+                        CM→CH Dev {format_flow_deviation(disp_dev_cpp)}
+                    </span>
+                    <span class="pipe-loss-badge eff-val">
+                        CH Ratio {format_number(disp_ch_ratio, 1)}%
+                    </span>         
                         </div>
                     </div>
                     <div class="pipe-node node-ch">
@@ -1510,8 +2382,12 @@ def main():
                             <div class="pipe-arrow-tip"></div>
                         </div>
                         <div class="pipe-conn-stats">
-                            <span class="pipe-loss-badge loss-val">Δ stok Port {format_large(disp_delta_port)}</span>
-                            <span class="pipe-loss-badge eff-val">Dev {format_large(disp_dev_port)}</span>
+                        <span class="pipe-loss-badge flow-dev">
+                            CH→Sales Dev {format_flow_deviation(disp_dev_port)}
+                        </span>
+                        <span class="pipe-loss-badge eff-val">
+                            Sales Ratio {format_number(disp_sales_ratio, 1)}%
+                        </span>
                         </div>
                     </div>
                     <div class="pipe-node node-sales">
@@ -1533,26 +2409,39 @@ def main():
                         <div class="ring-label">{format_number(_score_pct, 1)}%</div>
                     </div>
                     <div class="pipe-footer-text">
-                        <div class="pipe-footer-title">Reconciliation Deviation Overview</div>
-                        <div class="pipe-footer-detail">
-                            CPP Dev <span class="hl-red">{format_large(disp_dev_cpp)}</span>
-                            · Port Dev <span class="hl-red">{format_large(disp_dev_port)}</span>
-                        </div>
-                        <div class="pipe-footer-detail">
-                            CH Ratio <span class="hl-green">{format_number(disp_ch_ratio, 1)}%</span>
-                            · Sales Ratio <span class="hl-green">{format_number(disp_sales_ratio, 1)}%</span>
-                        </div>
+                    <div class="pipe-footer-title">Material Flow Deviation Overview</div>
+                    <div class="pipe-footer-detail">
+                        CM→CH Dev 
+                        <span class="{get_flow_deviation_class(disp_dev_cpp)}">{format_flow_deviation(disp_dev_cpp)}</span>
+                        · CH→Sales Dev 
+                        <span class="{get_flow_deviation_class(disp_dev_port)}">{format_flow_deviation(disp_dev_port)}</span>
+                    </div>
+                    <div class="pipe-footer-detail">
+                        CH Ratio <span class="hl-green">{format_number(disp_ch_ratio, 1)}%</span>
+                        · Sales Ratio <span class="hl-green">{format_number(disp_sales_ratio, 1)}%</span>
+                    </div>
                     </div>
                 </div>
             </div>
             </body>
             </html>
             """
+            def format_flow_deviation(value):
+                if pd.isna(value):
+                    return "-"
+                sign = "+" if value > 0 else ""
+                return f"{sign}{format_large(value)}"
 
+
+            def get_flow_deviation_text_class(value):
+                if pd.isna(value):
+                    return "neutral-dev"
+                return "positive-dev" if value >= 0 else "negative-dev"
+            
             components.html(pipeline_html, height=340, scrolling=False)
-
+    
             # ══════════════════════════════════════════════════════════
-            # STATUS DISTRIBUTION BY STAGE — Fluid Modern Design
+            # STATUS DISTRIBUTION BY STAGE
             # ══════════════════════════════════════════════════════════
             st.markdown("""
             <div class="section-header">
@@ -1647,7 +2536,7 @@ def main():
             """, unsafe_allow_html=True)
 
 
-            if len(flow) > 0:
+            if flow is not None and not flow.empty:
 
 
                 # ══════════════════════════════════════════════════════════
@@ -1883,18 +2772,17 @@ def main():
                 )
                 st.plotly_chart(fig_combined, use_container_width=True, key='production_vol_eff')
 
+            if flow is None or flow.empty:
+                st.info("Material Flow Analysis belum tersedia karena data flow kosong.")
+            else:
+                st.markdown("### Reconciliation Deviation Analysis")
 
-                # ══════════════════════════════════════════════════════════
-                # MATERIAL LOSS ANALYSIS — Enhanced Stacked + Cumulative
-                # ══════════════════════════════════════════════════════════
-                
+                flow["Net Deviation"] = flow["Deviation CPP"] + flow["Deviation Port"]
+                flow["Cum Net Deviation"] = flow["Net Deviation"].cumsum()
+
             # ══════════════════════════════════════════════════════════
             # RECONCILIATION DEVIATION ANALYSIS
             # ══════════════════════════════════════════════════════════
-            st.markdown("### Reconciliation Deviation Analysis")
-
-            flow["Net Deviation"] = flow["Deviation CPP"] + flow["Deviation Port"]
-            flow["Cum Net Deviation"] = flow["Net Deviation"].cumsum()
 
             avg_cm_ref = flow["CM TWB"].mean() if len(flow) > 0 else 0
             avg_net = flow["Net Deviation"].mean()
@@ -1954,12 +2842,12 @@ def main():
             fig_loss.add_trace(go.Bar(
                 x=flow["Date"],
                 y=flow["Deviation CPP"],
-                name="CPP33 Deviation",
+                name="CPP Deviation",
                 marker=dict(
                     color='rgba(234,179,8,0.7)',
                     line=dict(width=0.5, color='rgba(234,179,8,0.9)')
                 ),
-                hovertemplate='<b>CPP33 Deviation</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
+                hovertemplate='<b>CPP Deviation</b><br>%{x|%d %b %Y}<br>%{y:,.0f} ton<extra></extra>',
             ), secondary_y=False)
 
             net_colors = []
@@ -2370,7 +3258,7 @@ def main():
 
     with tab3:
         # ══════════════════════════════════════════════════════════
-        # TAB 3: CPP33 & PORT ANALYSIS — v6 (Samakan dengan Tab 2)
+        # TAB 3: CPP & PORT ANALYSIS — v6 (Samakan dengan Tab 2)
         # Perubahan: 1) Status Distribution dihilangkan
         #            2) Insight dihilangkan
         #            3) Alert di bawah KPI
@@ -2378,7 +3266,7 @@ def main():
         # ══════════════════════════════════════════════════════════
         st.markdown("""
         <div class="section-header">
-            <h3 class="section-title">CPP33 & Port Analysis</h3>
+            <h3 class="section-title">CPP & Port Analysis</h3>
         </div>
         """, unsafe_allow_html=True)
 
@@ -2388,7 +3276,7 @@ def main():
             df_valid_copy = df_valid.copy()
             df_valid_copy['YearMonth'] = df_valid_copy['Date'].dt.strftime('%b-%Y')
             available_months = sorted(df_valid_copy['YearMonth'].unique(),
-                                      key=lambda x: pd.to_datetime(x, format='%b-%Y'))
+                                    key=lambda x: pd.to_datetime(x, format='%b-%Y'))
 
             st.markdown("### Filter Periode")
             if len(available_months) > 1:
@@ -2713,28 +3601,28 @@ def main():
                             else:
                                 sc, sbg = '#4ade80', 'rgba(34,197,94,0.15)'
                             cells += (f'<td style="padding:8px 6px;text-align:center;">'
-                                      f'<span style="background:{sbg};color:{sc};padding:2px 8px;'
-                                      f'border-radius:20px;font-size:0.65rem;font-weight:700;">{s}</span></td>')
+                                    f'<span style="background:{sbg};color:{sc};padding:2px 8px;'
+                                    f'border-radius:20px;font-size:0.65rem;font-weight:700;">{s}</span></td>')
 
                         elif col_key in ('Dev_CH_Relatif_Pct', 'Dev_CM_Relatif_Pct'):
                             dv = float(val) if pd.notnull(val) else 0
                             dc = '#f87171' if abs(dv) > 3 else '#fbbf24' if abs(dv) > 2 else '#4ade80'
                             cells += (f'<td style="padding:8px 6px;text-align:center;color:{dc};'
-                                      f'font-weight:700;font-size:0.75rem;">{dv:+.2f}%</td>')
+                                    f'font-weight:700;font-size:0.75rem;">{dv:+.2f}%</td>')
 
                         elif col_key == 'Date':
                             cells += (f'<td style="padding:8px 6px;text-align:center;color:#cbd5e1;'
-                                      f'font-size:0.72rem;white-space:nowrap;">{str(val)[:10]}</td>')
+                                    f'font-size:0.72rem;white-space:nowrap;">{str(val)[:10]}</td>')
 
                         elif isinstance(val, (int, float)) and pd.notnull(val):
                             cells += (f'<td style="padding:8px 6px;text-align:center;color:#cbd5e1;'
-                                      f'font-size:0.72rem;">{val:,.2f}</td>')
+                                    f'font-size:0.72rem;">{val:,.2f}</td>')
                         else:
                             cells += (f'<td style="padding:8px 6px;text-align:center;color:#cbd5e1;'
-                                      f'font-size:0.72rem;">{val}</td>')
+                                    f'font-size:0.72rem;">{val}</td>')
 
                     chcm_rows += (f'<tr style="background:{row_bg};border-left:{bl};'
-                                  f'border-bottom:1px solid rgba(148,163,184,0.06);">{cells}</tr>')
+                                f'border-bottom:1px solid rgba(148,163,184,0.06);">{cells}</tr>')
 
                 st.markdown(f"""
                 <div style="background:linear-gradient(135deg,rgba(20,20,40,0.6),rgba(15,23,42,0.8));
@@ -2846,7 +3734,7 @@ def main():
             </tr>
             </thead><tbody>"""
 
-            stage_names = ['Overburden (OB)', 'Coal Hauling (CH/Port)', 'Coal Mining (CM/CPP33)']
+            stage_names = ['Overburden (OB)', 'Coal Hauling (CH/Port)', 'Coal Mining (CM/CPP)']
             for idx, row in matrix.iterrows():
                 disp_d = row['Avg']
                 dc = '#4ade80' if disp_d <= 2 else '#fbbf24' if disp_d <= 3 else '#f87171'
@@ -3159,7 +4047,7 @@ def main():
             )
 
             if latest_flow is not None:
-                dominant_dev_name = "Port" if abs(float(latest_flow["Deviation Port"])) >= abs(float(latest_flow["Deviation CPP"])) else "CPP33"
+                dominant_dev_name = "Port" if abs(float(latest_flow["Deviation Port"])) >= abs(float(latest_flow["Deviation CPP"])) else "CPP"
                 dominant_dev_value = float(latest_flow["Deviation Port"]) if dominant_dev_name == "Port" else float(latest_flow["Deviation CPP"])
                 findings.append(
                     f"Snapshot {latest_period_label}: deviation terbesar berada di {dominant_dev_name} "
@@ -3184,12 +4072,12 @@ def main():
                 actions.append("Coal Hauling masih caution: lakukan review berkala pada periode dengan deviasi mendekati 3%.")
 
             if cm_disp_dev > 2:
-                actions.append("Review Coal Mining / CPP33: cek konsistensi WB CM, perubahan stok CPP, dan input survey / densitas.")
+                actions.append("Review Coal Mining / CPP: cek konsistensi WB CM, perubahan stok CPP, dan input survey / densitas.")
 
             if latest_flow is not None and abs(float(latest_flow["Deviation Port"])) > abs(float(latest_flow["Deviation CPP"])):
-                actions.append("Fokus investigasi tambahan di Port karena deviation snapshot terbaru lebih dominan dibanding CPP33.")
+                actions.append("Fokus investigasi tambahan di Port karena deviation snapshot terbaru lebih dominan dibanding CPP.")
             else:
-                actions.append("Fokus investigasi tambahan di CPP33 bila deviation snapshot terbaru lebih dominan di hulu.")
+                actions.append("Fokus investigasi tambahan di CPP bila deviation snapshot terbaru lebih dominan di hulu.")
 
             if ob_disp_dev > 2:
                 actions.append("Untuk Overburden, validasi kembali JS vs TC pada bulan-bulan exception agar deviasi kembali ke rentang normal.")
@@ -3430,8 +4318,8 @@ def main():
             }
 
             def style_data_sheet(ws, title_text, hdr_row, data_start_row, merge_cols,
-                                 status_col_idx=None, freeze_cell='A2',
-                                 num_fmt_cols=None, pct_fmt_cols=None):
+                                status_col_idx=None, freeze_cell='A2',
+                                num_fmt_cols=None, pct_fmt_cols=None):
                 ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=merge_cols)
                 ws['A1'] = title_text
                 ws['A1'].font = Font(size=14, bold=True, color=C['white'])
@@ -3475,7 +4363,7 @@ def main():
             with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                 ed = []
                 ed.append(['KPP MINING — EXECUTIVE DEVIATION REPORT', '', '', '', '', '', ''])
-                ed.append([f'PT Kalimantan Prima Persada | Generated: {datetime.now().strftime("%d %b %Y, %H:%M")}', '', '', '', '', '', ''])
+                ed.append([f' | Generated: {datetime.now().strftime("%d %b %Y, %H:%M")}', '', '', '', '', '', ''])
                 ed.append(['', '', '', '', '', '', ''])
                 ed.append(['KEY PERFORMANCE INDICATORS', '', '', '', '', '', ''])
                 ed.append(['Overall Perf', 'Total Periods', 'Critical Alerts', 'CH Ratio', 'OB Avg Dev', 'CH Avg Dev', 'CM Avg Dev'])
@@ -3700,13 +4588,13 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0}}
 .footer{{margin-top:16px;padding-top:18px;border-top:1px solid rgba(148,163,184,0.12);text-align:center;color:#64748B;font-size:0.82rem}}
 
 @media (max-width: 1100px) {{
-  .kpi-grid{{grid-template-columns:repeat(2,1fr)}}
-  .grid-2,.grid-2-eq{{grid-template-columns:1fr}}
-  .mini-grid{{grid-template-columns:repeat(2,1fr)}}
+.kpi-grid{{grid-template-columns:repeat(2,1fr)}}
+.grid-2,.grid-2-eq{{grid-template-columns:1fr}}
+.mini-grid{{grid-template-columns:repeat(2,1fr)}}
 }}
 @media (max-width: 700px) {{
-  .kpi-grid{{grid-template-columns:1fr}}
-  .mini-grid{{grid-template-columns:1fr}}
+.kpi-grid{{grid-template-columns:1fr}}
+.mini-grid{{grid-template-columns:1fr}}
 }}
 </style>
 </head>
@@ -3714,7 +4602,7 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0}}
 <div class="wrap">
 
 <div class="hero">
-    <div class="sub">PT Kalimantan Prima Persada</div>
+    <div class="sub"></div>
     <h1>Executive Deviation & Reconciliation Report</h1>
     <div class="meta">Generated: {report_date} · Latest flow snapshot: {latest_period_label}</div>
 </div>
@@ -3803,7 +4691,7 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0}}
 </div>
 
 <div class="footer">
-    PT Kalimantan Prima Persada — Mining Volume Deviation Monitoring System<br>
+    — Mining Volume Deviation Monitoring System<br>
     Report generated: {report_date}
 </div>
 
@@ -3946,7 +4834,7 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0}}
                             y = PAD
                             rounded_box(PAD, y, CONTENT_W, HEADER_H, PANEL)
                             draw.text((PAD + 28, y + 24), "Executive Deviation & Reconciliation Report", font=font_title, fill=WHITE)
-                            draw.text((PAD + 28, y + 78), "PT Kalimantan Prima Persada", font=font_sub, fill=GREEN)
+                            draw.text((PAD + 28, y + 78), "", font=font_sub, fill=GREEN)
                             draw.text((W - PAD - 320, y + 32), f"Generated: {report_date}", font=font_sub, fill=MUTED)
                             draw.text((W - PAD - 320, y + 68), f"Latest snapshot: {latest_period_label}", font=font_sub, fill=MUTED)
 

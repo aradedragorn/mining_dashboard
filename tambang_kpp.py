@@ -4734,11 +4734,19 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0}}
                             from PIL import ImageDraw, ImageFont
 
                             png_theme = dict(
-                                font=dict(family="Inter, Arial, sans-serif", color="#E2E8F0", size=12),
+                                font=dict(family="Inter, Arial, sans-serif", color="#E2E8F0", size=24),
                                 plot_bgcolor="#182332",
                                 paper_bgcolor="#182332",
-                                margin=dict(l=55, r=35, t=70, b=50),
-                                hovermode="x unified"
+                                margin=dict(l=110, r=70, t=100, b=80),
+                                hovermode="x unified",
+                                legend=dict(
+                                    font=dict(size=22, color="#E2E8F0"),
+                                    orientation="h",
+                                    yanchor="bottom",
+                                    y=1.03,
+                                    xanchor="center",
+                                    x=0.5
+                                )
                             )
 
                             fig_stage_png = make_fig_stage_summary(png_theme)
@@ -4759,14 +4767,14 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0}}
                             YELLOW = (245, 158, 11)
                             RED = (239, 68, 68)
 
-                            W = 2200
-                            PAD = 42
-                            GAP = 18
-                            HEADER_H = 130
-                            KPI_H = 150
-                            INFO_H = 330
-                            CHART_H = 430
-                            FOOT_H = 70
+                            W = 3000
+                            PAD = 60
+                            GAP = 26
+                            HEADER_H = 170
+                            KPI_H = 210
+                            INFO_H = 420
+                            CHART_H = 580
+                            FOOT_H = 110
                             CONTENT_W = W - PAD * 2
 
                             H = PAD + HEADER_H + GAP + KPI_H + GAP + INFO_H + GAP + CHART_H + GAP + CHART_H + GAP + FOOT_H + PAD
@@ -4774,21 +4782,21 @@ body{{font-family:Inter,sans-serif;background:#0F172A;color:#E2E8F0}}
                             draw = ImageDraw.Draw(canvas)
 
                             try:
-                                font_title = ImageFont.truetype("arial.ttf", 44)
-                                font_sub = ImageFont.truetype("arial.ttf", 20)
-                                font_h2 = ImageFont.truetype("arial.ttf", 24)
-                                font_body = ImageFont.truetype("arial.ttf", 18)
-                                font_small = ImageFont.truetype("arial.ttf", 14)
-                                font_kpi_value = ImageFont.truetype("arial.ttf", 34)
-                                font_kpi_label = ImageFont.truetype("arial.ttf", 15)
-                                font_kpi_status = ImageFont.truetype("arial.ttf", 18)
-                                font_table_head = ImageFont.truetype("arial.ttf", 15)
-                                font_table_cell = ImageFont.truetype("arial.ttf", 16)
-                            except Exception:
+                                font_title = ImageFont.truetype("arialbd.ttf", 34)
+                                font_subtitle = ImageFont.truetype("arial.ttf", 24)
+                                font_kpi_label = ImageFont.truetype("arialbd.ttf", 24)
+                                font_kpi_value = ImageFont.truetype("arialbd.ttf", 34)
+                                font_body = ImageFont.truetype("arial.ttf", 24)
+                                font_small = ImageFont.truetype("arial.ttf", 21)
+                                font_table = ImageFont.truetype("arial.ttf", 22)
+                            except:
                                 font_title = ImageFont.load_default()
-                                font_sub = font_h2 = font_body = font_small = font_title
-                                font_kpi_value = font_kpi_label = font_kpi_status = font_title
-                                font_table_head = font_table_cell = font_title
+                                font_subtitle = ImageFont.load_default()
+                                font_kpi_label = ImageFont.load_default()
+                                font_kpi_value = ImageFont.load_default()
+                                font_body = ImageFont.load_default()
+                                font_small = ImageFont.load_default()
+                                font_table = ImageFont.load_default()
 
                             def rounded_box(x, y, w, h, fill, outline=BORDER, radius=18, width=1):
                                 draw.rounded_rectangle([x, y, x+w, y+h], radius=radius, fill=fill, outline=outline, width=width)
